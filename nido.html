@@ -1,0 +1,3361 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Nido 🪺" />
+  <meta name="theme-color" content="#C2185B" />
+  <title>Nido 🪺</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://accounts.google.com/gsi/client" async></script>
+
+  <style>
+    /* ══════════════════════════════════════
+       RESET
+    ══════════════════════════════════════ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      -webkit-font-smoothing: antialiased;
+      background: #FFF0F5;
+      color: #2D1B2E;
+    }
+
+    /* ══════════════════════════════════════
+       VARIABLES
+    ══════════════════════════════════════ */
+    :root {
+      /* Rosa principal */
+      --rose:        #C2185B;
+      --rose-dark:   #880E4F;
+      --rose-mid:    #E91E8C;
+      --rose-light:  #F48FB1;
+      --rose-pale:   #FCE4EC;
+      --rose-ghost:  #FFF0F5;
+
+      /* Crema / neutros cálidos */
+      --cream:       #FFF8F0;
+      --warm-white:  #FFFFFF;
+      --text:        #2D1B2E;
+      --text-muted:  #8B6572;
+      --border:      #F8BBD9;
+
+      /* Shadows */
+      --shadow:       0 2px 16px rgba(194,24,91,.10);
+      --shadow-lg:    0 6px 28px rgba(194,24,91,.18);
+
+      /* Radios */
+      --r:   16px;
+      --r-sm: 10px;
+
+      /* Layout */
+      --nav-h:    68px;
+      --safe-b:   env(safe-area-inset-bottom, 0px);
+    }
+
+    /* ══════════════════════════════════════
+       SCROLLABLE PAGE
+    ══════════════════════════════════════ */
+    .page {
+      height: calc(100dvh - var(--nav-h) - var(--safe-b));
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      padding: 0 16px 32px;
+    }
+
+    /* ══════════════════════════════════════
+       CARDS
+    ══════════════════════════════════════ */
+    .card {
+      background: var(--warm-white);
+      border-radius: var(--r);
+      padding: 20px;
+      box-shadow: var(--shadow);
+      margin-bottom: 14px;
+    }
+    .card-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+
+    /* ══════════════════════════════════════
+       GRADIENT CARDS
+    ══════════════════════════════════════ */
+    .grad-card {
+      background: linear-gradient(135deg, var(--rose-dark) 0%, var(--rose) 55%, var(--rose-mid) 100%);
+      border-radius: var(--r);
+      padding: 22px 20px;
+      margin-bottom: 14px;
+      color: #fff;
+    }
+
+    /* ══════════════════════════════════════
+       BUTTONS
+    ══════════════════════════════════════ */
+    .btn-primary {
+      width: 100%;
+      background: linear-gradient(135deg, var(--rose), var(--rose-mid));
+      border: none;
+      border-radius: var(--r-sm);
+      padding: 15px;
+      color: #fff;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: opacity .15s, transform .15s;
+      box-shadow: 0 4px 16px rgba(194,24,91,.3);
+    }
+    .btn-primary:active { opacity: .85; transform: scale(.98); }
+    .btn-primary:disabled { opacity: .45; }
+
+    .btn-ghost {
+      background: var(--rose-ghost);
+      border: 1.5px solid var(--border);
+      border-radius: var(--r-sm);
+      padding: 10px 18px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--rose);
+      cursor: pointer;
+    }
+
+    /* ══════════════════════════════════════
+       PROGRESS BAR
+    ══════════════════════════════════════ */
+    .progress-wrap {
+      background: var(--rose-pale);
+      border-radius: 99px;
+      height: 10px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--rose), var(--rose-mid));
+      border-radius: 99px;
+      transition: width .7s cubic-bezier(.34,1.56,.64,1);
+    }
+
+    /* ══════════════════════════════════════
+       FORM INPUTS
+    ══════════════════════════════════════ */
+    .form-group { margin-bottom: 14px; }
+    .form-label {
+      display: block;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+    .form-input, .form-select {
+      width: 100%;
+      border: 2px solid var(--border);
+      border-radius: var(--r-sm);
+      padding: 12px 14px;
+      font-size: 16px;
+      font-family: inherit;
+      background: var(--warm-white);
+      color: var(--text);
+      outline: none;
+      appearance: none;
+      transition: border-color .15s;
+    }
+    .form-input:focus, .form-select:focus { border-color: var(--rose); }
+
+    /* ══════════════════════════════════════
+       CHIPS / PILLS
+    ══════════════════════════════════════ */
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: var(--rose-ghost);
+      border: 1.5px solid var(--border);
+      border-radius: 99px;
+      padding: 4px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+    .chip.active { background: var(--rose-pale); border-color: var(--rose); color: var(--rose); }
+
+    /* ══════════════════════════════════════
+       EMPTY STATE
+    ══════════════════════════════════════ */
+    .empty {
+      text-align: center;
+      padding: 28px 16px;
+      color: var(--text-muted);
+    }
+    .empty .ei { font-size: 36px; margin-bottom: 8px; }
+    .empty p { font-size: 13px; line-height: 1.5; }
+
+    /* ══════════════════════════════════════
+       STATS ROW
+    ══════════════════════════════════════ */
+    .stats-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .stat-box {
+      background: var(--warm-white);
+      border-radius: var(--r-sm);
+      padding: 14px 8px;
+      text-align: center;
+      box-shadow: var(--shadow);
+    }
+    .stat-val { font-size: 22px; font-weight: 700; color: var(--rose); }
+    .stat-lbl { font-size: 10px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; margin-top: 2px; }
+
+    /* ══════════════════════════════════════
+       FEED ITEMS
+    ══════════════════════════════════════ */
+    .feed-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .feed-item:last-child { border-bottom: none; }
+    .feed-av {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+    .feed-name { font-size: 13px; font-weight: 600; color: var(--text); }
+    .feed-desc { font-size: 13px; color: var(--text-muted); margin-top: 1px; }
+    .feed-time { font-size: 11px; color: var(--text-muted); margin-left: auto; flex-shrink: 0; padding-top: 2px; }
+
+    /* ══════════════════════════════════════
+       SAVINGS LIST
+    ══════════════════════════════════════ */
+    .save-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .save-item:last-child { border-bottom: none; }
+    .save-left { display: flex; align-items: center; gap: 10px; }
+    .save-av { font-size: 20px; }
+    .save-name { font-size: 13px; font-weight: 600; }
+    .save-meta { font-size: 12px; color: var(--text-muted); }
+    .save-amount { font-size: 15px; font-weight: 700; color: #2E7D32; }
+
+    /* ══════════════════════════════════════
+       VS CARD (RETOS)
+    ══════════════════════════════════════ */
+    .vs-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin: 16px 0;
+    }
+    .vs-player { flex: 1; text-align: center; }
+    .vs-player-em { font-size: 38px; margin-bottom: 4px; }
+    .vs-player-name { font-size: 12px; font-weight: 600; opacity: .85; }
+    .vs-player-score { font-size: 48px; font-weight: 700; line-height: 1; margin-top: 4px; }
+    .vs-sep { font-size: 16px; opacity: .45; }
+    .vs-banner {
+      background: rgba(255,255,255,.15);
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      text-align: center;
+      margin-top: 8px;
+    }
+
+    /* ══════════════════════════════════════
+       SCORE BREAKDOWN
+    ══════════════════════════════════════ */
+    .score-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .score-row:last-child { border-bottom: none; }
+    .score-icon { font-size: 16px; width: 22px; text-align: center; flex-shrink: 0; }
+    .score-lbl { font-size: 13px; color: var(--text-muted); flex: 1; }
+    .score-pts { font-size: 14px; font-weight: 700; color: var(--rose); }
+
+    /* ══════════════════════════════════════
+       PROFILE CARDS
+    ══════════════════════════════════════ */
+    .profile-duo {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    .profile-mini {
+      background: var(--warm-white);
+      border-radius: var(--r);
+      padding: 18px 14px;
+      box-shadow: var(--shadow);
+      text-align: center;
+    }
+    .pm-av { font-size: 34px; margin-bottom: 6px; }
+    .pm-name { font-size: 15px; font-weight: 700; margin-bottom: 2px; }
+    .pm-score { font-size: 26px; font-weight: 700; color: var(--rose); }
+    .pm-lbl { font-size: 10px; color: var(--text-muted); }
+
+    /* ══════════════════════════════════════
+       SPARK ITEMS
+    ══════════════════════════════════════ */
+    .spark-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 10px;
+      background: linear-gradient(135deg, rgba(194,24,91,.05), rgba(233,30,140,.05));
+      border-radius: 12px;
+      margin-bottom: 8px;
+    }
+    .spark-from { font-size: 18px; }
+    .spark-msg { font-size: 13px; color: var(--text); flex: 1; }
+    .spark-time { font-size: 11px; color: var(--text-muted); }
+
+    /* ══════════════════════════════════════
+       CONFIG ROWS
+    ══════════════════════════════════════ */
+    .cfg-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .cfg-row:last-child { border-bottom: none; }
+    .cfg-lbl { font-size: 15px; font-weight: 600; }
+    .cfg-val { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+
+    /* ══════════════════════════════════════
+       BOTTOM SHEET
+    ══════════════════════════════════════ */
+    #sheet-wrap {
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+      display: none;
+    }
+    #sheet-wrap.open { display: block; }
+    .sheet-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(45,27,46,.45);
+      backdrop-filter: blur(5px);
+    }
+    .sheet-body {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      background: var(--warm-white);
+      border-radius: 24px 24px 0 0;
+      padding: 16px 20px calc(24px + var(--safe-b));
+      max-height: 88dvh;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .sheet-handle {
+      width: 38px; height: 4px;
+      background: var(--border);
+      border-radius: 99px;
+      margin: 0 auto 18px;
+    }
+    .sheet-title { font-size: 20px; font-weight: 700; color: var(--text); margin-bottom: 18px; }
+
+    /* Log type selector */
+    .log-opts {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+    .log-opt {
+      background: var(--rose-ghost);
+      border: 2px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      text-align: center;
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .log-opt.sel { border-color: var(--rose); background: var(--rose-pale); }
+    .log-opt .lo-icon { font-size: 26px; margin-bottom: 5px; }
+    .log-opt .lo-name { font-size: 13px; font-weight: 600; color: var(--text); }
+
+    /* Habit grid */
+    .habit-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 9px;
+    }
+    .habit-chip {
+      background: var(--rose-ghost);
+      border: 2px solid var(--border);
+      border-radius: 11px;
+      padding: 11px 6px;
+      text-align: center;
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .habit-chip.sel { border-color: var(--rose); background: var(--rose-pale); }
+    .hc-icon { font-size: 22px; margin-bottom: 3px; }
+    .hc-name { font-size: 10px; font-weight: 600; color: var(--text-muted); }
+
+    /* Spark preset buttons */
+    .spark-preset {
+      width: 100%;
+      background: var(--rose-ghost);
+      border: 1.5px solid var(--border);
+      border-radius: 11px;
+      padding: 12px 14px;
+      text-align: left;
+      font-size: 14px;
+      color: var(--text);
+      cursor: pointer;
+      transition: all .15s;
+      margin-bottom: 8px;
+      display: block;
+    }
+    .spark-preset:active { background: var(--rose-pale); border-color: var(--rose); }
+
+    /* ══════════════════════════════════════
+       SPLASH SCREEN
+    ══════════════════════════════════════ */
+    #splash {
+      position: fixed;
+      inset: 0;
+      background: linear-gradient(160deg, #880E4F 0%, #C2185B 45%, #E91E8C 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 40px 24px;
+    }
+    .splash-nest { font-size: 76px; margin-bottom: 10px; animation: pop .5s cubic-bezier(.34,1.56,.64,1); }
+    .splash-title { font-size: 44px; font-weight: 700; color: #fff; letter-spacing: -1.5px; margin-bottom: 6px; }
+    .splash-sub { font-size: 15px; color: rgba(255,255,255,.78); margin-bottom: 52px; text-align: center; }
+    .splash-who { font-size: 12px; color: rgba(255,255,255,.55); letter-spacing: .12em; text-transform: uppercase; margin-bottom: 18px; }
+    .user-cards { display: flex; gap: 14px; width: 100%; max-width: 280px; }
+    .user-card-btn {
+      flex: 1;
+      background: rgba(255,255,255,.15);
+      border: 2px solid rgba(255,255,255,.3);
+      border-radius: 20px;
+      padding: 22px 12px;
+      display: flex; flex-direction: column; align-items: center; gap: 9px;
+      color: #fff;
+      font-size: 15px; font-weight: 600;
+      cursor: pointer;
+      backdrop-filter: blur(8px);
+      transition: all .2s;
+    }
+    .user-card-btn:active { transform: scale(.95); background: rgba(255,255,255,.25); }
+    .user-card-btn .uc-av { font-size: 38px; }
+
+    /* ══════════════════════════════════════
+       BOTTOM NAV
+    ══════════════════════════════════════ */
+    #bottom-nav {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      height: calc(var(--nav-h) + var(--safe-b));
+      padding-bottom: var(--safe-b);
+      background: var(--warm-white);
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-around;
+      z-index: 100;
+    }
+    .nav-btn {
+      flex: 1;
+      display: flex; flex-direction: column; align-items: center;
+      gap: 3px; padding: 8px 0 0;
+      background: none; border: none;
+      cursor: pointer;
+      color: var(--text-muted);
+      font-size: 10px; font-weight: 600;
+      letter-spacing: .05em; text-transform: uppercase;
+      transition: color .15s;
+    }
+    .nav-btn .ni { font-size: 22px; line-height: 1; }
+    .nav-btn.active { color: var(--rose); }
+    /* FAB flotante (esquina inferior derecha) */
+    .log-fab {
+      position: fixed;
+      bottom: calc(var(--nav-h) + var(--safe-b) + 14px);
+      right: 18px;
+      width: 54px; height: 54px;
+      background: linear-gradient(135deg, var(--rose), var(--rose-mid));
+      border-radius: 18px; border: none;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 26px; color: #fff;
+      cursor: pointer;
+      box-shadow: 0 6px 20px rgba(194,24,91,.45);
+      z-index: 50;
+      transition: transform .15s;
+    }
+    .log-fab:active { transform: scale(.93); }
+
+    /* Sub-tabs (chips horizontales dentro de cada sección) */
+    .sub-tabs {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding: 14px 0 10px;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    .sub-tabs::-webkit-scrollbar { display: none; }
+    .sub-tab {
+      flex-shrink: 0;
+      background: var(--rose-ghost);
+      border: 1.5px solid var(--border);
+      border-radius: 99px;
+      padding: 7px 16px;
+      font-size: 13px; font-weight: 600;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all .15s;
+      white-space: nowrap;
+    }
+    .sub-tab.active {
+      background: var(--rose-pale);
+      border-color: var(--rose);
+      color: var(--rose);
+    }
+
+    /* PAGE HEADER */
+    .page-header {
+      padding: 18px 0 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .page-title { font-size: 24px; font-weight: 700; letter-spacing: -.5px; }
+
+    /* ══════════════════════════════════════
+       TOAST
+    ══════════════════════════════════════ */
+    #toast {
+      position: fixed;
+      top: 20px; left: 50%;
+      transform: translateX(-50%) translateY(-110px);
+      background: var(--text);
+      color: #fff;
+      padding: 12px 20px;
+      border-radius: 99px;
+      font-size: 14px; font-weight: 600;
+      z-index: 500;
+      transition: transform .3s cubic-bezier(.34,1.56,.64,1);
+      white-space: nowrap;
+      max-width: calc(100vw - 32px);
+      text-align: center;
+      pointer-events: none;
+    }
+    #toast.show { transform: translateX(-50%) translateY(0); }
+    #toast.ok  { background: #388E3C; }
+    #toast.hot { background: linear-gradient(135deg, var(--rose), var(--rose-mid)); }
+
+    /* ══════════════════════════════════════
+       ANIMATIONS
+    ══════════════════════════════════════ */
+    @keyframes pop {
+      0%   { transform: scale(.4); opacity: 0; }
+      100% { transform: scale(1);  opacity: 1; }
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0);    }
+    }
+    .fade-up { animation: fadeUp .3s ease forwards; }
+
+    /* ══════════════════════════════════════
+       SHEET ANIMATION
+    ══════════════════════════════════════ */
+    @keyframes slideUp {
+      from { transform: translateY(100%); }
+      to   { transform: translateY(0);    }
+    }
+    .sheet-body { animation: slideUp .28s cubic-bezier(.32,.72,0,1); }
+
+    /* ══════════════════════════════════════
+       CARD ACTIVE (feedback táctil)
+    ══════════════════════════════════════ */
+    .card:active { transform: scale(.99); }
+
+    /* ══════════════════════════════════════
+       SYNC DOT (punto verde de conexión)
+    ══════════════════════════════════════ */
+    .sync-dot {
+      display: inline-block;
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: #22c55e;
+      animation: syncPulse 2s infinite;
+      flex-shrink: 0;
+    }
+    .sync-dot.off { background: #94a3b8; animation: none; }
+    @keyframes syncPulse {
+      0%   { box-shadow: 0 0 0 0 rgba(34,197,94,.5); }
+      70%  { box-shadow: 0 0 0 6px rgba(34,197,94,0); }
+      100% { box-shadow: 0 0 0 0 rgba(34,197,94,0); }
+    }
+
+    /* ══════════════════════════════════════
+       LOADING SCREEN
+    ══════════════════════════════════════ */
+    #loading-screen {
+      position: fixed; inset: 0;
+      background: linear-gradient(160deg, #880E4F 0%, #C2185B 45%, #E91E8C 100%);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      z-index: 999;
+      gap: 20px;
+    }
+    #loading-screen.hidden { display: none; }
+    .loader-nest { font-size: 52px; animation: pop .4s cubic-bezier(.34,1.56,.64,1); }
+    .loader-spinner {
+      width: 32px; height: 32px;
+      border: 3px solid rgba(255,255,255,.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+    }
+    .loader-text { font-size: 14px; color: rgba(255,255,255,.75); font-weight: 600; font-family: 'Inter', sans-serif; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loader-retry {
+      background: rgba(255,255,255,.2);
+      border: 1.5px solid rgba(255,255,255,.4);
+      border-radius: 12px;
+      padding: 10px 22px;
+      color: #fff; font-size: 14px; font-weight: 600;
+      cursor: pointer; display: none;
+    }
+
+    /* ══════════════════════════════════════
+       METAS LIBRES
+    ══════════════════════════════════════ */
+    .goal-card {
+      background: var(--warm-white);
+      border-radius: var(--r);
+      padding: 16px;
+      box-shadow: var(--shadow);
+      margin-bottom: 10px;
+      border-left: 4px solid var(--rose);
+    }
+    .goal-card.done { border-left-color: #388E3C; opacity: .75; }
+    .goal-icon { font-size: 28px; margin-bottom: 6px; }
+    .goal-name { font-size: 15px; font-weight: 700; }
+    .goal-meta { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+    .goal-type-row {
+      display: grid; grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px; margin-bottom: 14px;
+    }
+    .goal-type-btn {
+      background: var(--rose-ghost);
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 6px;
+      text-align: center;
+      cursor: pointer; transition: all .15s;
+      font-size: 13px; font-weight: 600;
+      color: var(--text-muted);
+    }
+    .goal-type-btn.sel { border-color: var(--rose); background: var(--rose-pale); color: var(--rose); }
+
+    /* ══════════════════════════════════════
+       AGENDA
+    ══════════════════════════════════════ */
+    .cal-grid {
+      display: grid; grid-template-columns: repeat(7, 1fr);
+      gap: 4px; margin-bottom: 14px;
+    }
+    .cal-day {
+      aspect-ratio: 1; border-radius: 8px;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 600;
+      cursor: pointer; position: relative;
+    }
+    .cal-day.today { background: var(--rose); color: #fff; }
+    .cal-day.has-event::after {
+      content: ''; position: absolute; bottom: 3px;
+      width: 5px; height: 5px; border-radius: 50%;
+      background: var(--rose-mid);
+    }
+    .cal-day.today.has-event::after { background: #fff; }
+    .cal-day.other-month { opacity: .3; }
+    .cal-hdr { font-size: 10px; font-weight: 700; text-align: center; color: var(--text-muted); text-transform: uppercase; }
+
+    /* ══════════════════════════════════════
+       PENDIENTES JUNTOS
+    ══════════════════════════════════════ */
+    .pending-card {
+      background: var(--warm-white);
+      border-radius: var(--r);
+      padding: 14px 16px;
+      box-shadow: var(--shadow);
+      margin-bottom: 10px;
+      display: flex; align-items: center; gap: 12px;
+    }
+    .pending-icon { font-size: 30px; flex-shrink: 0; }
+    .pending-name { font-size: 14px; font-weight: 700; }
+    .pending-meta { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+    .pending-status {
+      margin-left: auto; flex-shrink: 0;
+      font-size: 12px; font-weight: 700;
+      padding: 4px 10px; border-radius: 99px;
+    }
+    .status-want  { background: var(--rose-pale); color: var(--rose); }
+    .status-booked { background: #FFF9C4; color: #F9A825; }
+    .status-done  { background: #E8F5E9; color: #388E3C; }
+
+    /* ══════════════════════════════════════
+       DIARIO DEL NIDO
+    ══════════════════════════════════════ */
+    .memory-card {
+      background: var(--warm-white);
+      border-radius: var(--r);
+      box-shadow: var(--shadow);
+      margin-bottom: 14px;
+      overflow: hidden;
+    }
+    .memory-img {
+      width: 100%; height: 180px;
+      object-fit: cover; display: block;
+    }
+    .memory-body { padding: 14px 16px; }
+    .memory-title { font-size: 15px; font-weight: 700; }
+    .memory-text { font-size: 13px; color: var(--text-muted); margin-top: 4px; line-height: 1.5; }
+    .memory-footer { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 11px; color: var(--text-muted); }
+
+    /* ══════════════════════════════════════
+       RETO FÍSICO
+    ══════════════════════════════════════ */
+    .fitness-vs {
+      display: grid; grid-template-columns: 1fr auto 1fr;
+      gap: 8px; align-items: center; margin: 12px 0;
+    }
+    .fitness-player { text-align: center; }
+    .fitness-score { font-size: 36px; font-weight: 800; line-height: 1; }
+    .fitness-name  { font-size: 12px; font-weight: 600; opacity: .8; margin-top: 4px; }
+    .fitness-sep   { font-size: 14px; opacity: .4; font-weight: 700; }
+    .metric-row {
+      display: flex; align-items: center;
+      justify-content: space-between;
+      padding: 10px 0; border-bottom: 1px solid var(--border);
+    }
+    .metric-row:last-child { border-bottom: none; }
+    .metric-icon { font-size: 18px; width: 28px; text-align: center; flex-shrink: 0; }
+    .metric-lbl  { font-size: 13px; color: var(--text-muted); flex: 1; margin-left: 8px; }
+    .metric-vals { display: flex; gap: 12px; align-items: center; }
+    .metric-val  { font-size: 14px; font-weight: 700; min-width: 44px; text-align: right; }
+    .metric-winner { font-size: 14px; }
+
+    /* Mini chart (SVG sparkline) */
+    .sparkline-wrap { overflow-x: auto; padding-bottom: 4px; }
+
+    /* ══════════════════════════════════════
+       LOGROS (ACHIEVEMENTS)
+    ══════════════════════════════════════ */
+    .achievement-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .achievement-card {
+      background: var(--warm-white);
+      border-radius: var(--r);
+      padding: 16px 12px;
+      text-align: center;
+      box-shadow: var(--shadow);
+      border: 2px solid var(--border);
+      transition: all .2s;
+    }
+    .achievement-card.unlocked {
+      border-color: #FFD700;
+      background: linear-gradient(135deg, #FFFDE7, #FFF8E1);
+    }
+    .achievement-card.locked { opacity: .45; filter: grayscale(.6); }
+    .ach-icon { font-size: 32px; margin-bottom: 6px; }
+    .ach-name { font-size: 12px; font-weight: 700; color: var(--text); margin-bottom: 2px; }
+    .ach-desc { font-size: 10px; color: var(--text-muted); line-height: 1.4; }
+    .ach-date { font-size: 10px; color: #B8860B; font-weight: 600; margin-top: 4px; }
+
+    /* ══════════════════════════════════════
+       NOTAS SECRETAS
+    ══════════════════════════════════════ */
+    .note-card {
+      background: linear-gradient(135deg, #FFF0F5, #FCE4EC);
+      border: 1.5px solid var(--border);
+      border-radius: var(--r);
+      padding: 18px;
+      margin-bottom: 10px;
+      position: relative;
+    }
+    .note-ribbon {
+      position: absolute; top: 12px; right: 12px;
+      font-size: 10px; font-weight: 700;
+      background: var(--rose-pale); color: var(--rose);
+      padding: 3px 8px; border-radius: 99px;
+    }
+    .note-msg { font-size: 14px; line-height: 1.6; color: var(--text); }
+    .note-from { font-size: 11px; color: var(--text-muted); margin-top: 8px; }
+
+    /* ══════════════════════════════════════
+       HÁBITOS MEJORADOS
+    ══════════════════════════════════════ */
+    .habit-goal-card {
+      background: var(--warm-white);
+      border-radius: var(--r);
+      padding: 14px 16px;
+      box-shadow: var(--shadow);
+      margin-bottom: 10px;
+    }
+    .habit-goal-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+    .habit-goal-icon { font-size: 22px; }
+    .habit-goal-name { font-size: 14px; font-weight: 700; flex: 1; }
+    .habit-goal-pct { font-size: 14px; font-weight: 800; color: var(--rose); }
+    .habit-days {
+      display: flex; gap: 5px; margin-top: 6px;
+    }
+    .habit-day {
+      width: 28px; height: 28px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 700;
+      background: var(--rose-ghost); border: 1.5px solid var(--border);
+      color: var(--text-muted);
+    }
+    .habit-day.done { background: var(--rose-pale); border-color: var(--rose); color: var(--rose); }
+    .habit-day.today { border-color: var(--rose-mid); font-weight: 800; }
+
+    /* ══════════════════════════════════════
+       MAPA (placeholder hasta tener Leaflet)
+    ══════════════════════════════════════ */
+    #map-container {
+      width: 100%; height: 320px;
+      border-radius: var(--r);
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+  </style>
+</head>
+<body>
+  <!-- Splash -->
+  <div id="splash">
+    <div class="splash-nest">🪺</div>
+    <div class="splash-title">Nido</div>
+    <div class="splash-sub">El nido de Alonso y Lila 💕</div>
+    <div class="splash-who">¿Quién eres?</div>
+    <div class="user-cards">
+      <button class="user-card-btn" onclick="selectUser('alonso')">
+        <div class="uc-av">👨</div>
+        <span>Alonso</span>
+      </button>
+      <button class="user-card-btn" onclick="selectUser('lila')">
+        <div class="uc-av">👩</div>
+        <span>Lila</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Loading screen (aparece mientras boot() carga datos) -->
+  <div id="loading-screen" class="hidden">
+    <div class="loader-nest">🪺</div>
+    <div class="loader-spinner"></div>
+    <div class="loader-text" id="loader-msg">Cargando Nido...</div>
+    <button class="loader-retry" id="loader-retry" onclick="location.reload()">Reintentar</button>
+  </div>
+
+  <!-- App shell -->
+  <div id="app" style="display:none">
+    <div id="tab-content"></div>
+
+    <!-- FAB flotante -->
+    <button class="log-fab" id="main-fab" onclick="openSmartLog()">➕</button>
+
+    <nav id="bottom-nav">
+      <button class="nav-btn active" id="nav-hoy"    onclick="switchTab('hoy')">
+        <span class="ni">🏠</span><span>HOY</span>
+      </button>
+      <button class="nav-btn" id="nav-metas"  onclick="switchTab('metas')">
+        <span class="ni">🎯</span><span>METAS</span>
+      </button>
+      <button class="nav-btn" id="nav-vida"   onclick="switchTab('vida')">
+        <span class="ni">🌸</span><span>VIDA</span>
+      </button>
+      <button class="nav-btn" id="nav-cuerpo" onclick="switchTab('cuerpo')">
+        <span class="ni">💪</span><span>CUERPO</span>
+      </button>
+      <button class="nav-btn" id="nav-nido"   onclick="switchTab('nido')">
+        <span class="ni">🪺</span><span>NIDO</span>
+      </button>
+    </nav>
+  </div>
+
+  <!-- Bottom Sheet -->
+  <div id="sheet-wrap">
+    <div class="sheet-overlay" onclick="closeSheet()"></div>
+    <div class="sheet-body" id="sheet-body"></div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast"></div>
+
+  <script>
+  /* ═══════════════════════════════════════════════════
+     CONFIG
+  ═══════════════════════════════════════════════════ */
+  const CFG = {
+    SUPABASE_URL: 'YOUR_SUPABASE_URL',
+    SUPABASE_KEY: 'YOUR_SUPABASE_ANON_KEY',
+
+    USERS: {
+      alonso: { id:'alonso', name:'Alonso', emoji:'👨', bg:'#E8EAF6', color:'#3949AB' },
+      lila:   { id:'lila',   name:'Lila',   emoji:'👩', bg:'#FCE4EC', color:'#C2185B' }
+    },
+
+    GOALS: {
+      europa: { id:'europa', icon:'✈️', name:'Viaje a Europa', target:null },
+      perro:  { id:'perro',  icon:'🐾', name:'Nuestro perro', target:15000, targetMax:28000 }
+    },
+
+    HABITS: [
+      { id:'gym',     icon:'💪', name:'Ejercicio'  },
+      { id:'read',    icon:'📚', name:'Leer'       },
+      { id:'healthy', icon:'🥗', name:'Comer sano' },
+      { id:'date',    icon:'💕', name:'Juntos'     },
+      { id:'work',    icon:'💼', name:'Trabajo'    },
+      { id:'meditate',icon:'🧘', name:'Meditar'    }
+    ],
+
+    SCORE: { PER_100: 1, PER_HABIT: 5, PER_SPARK: 2 },
+
+    // Google Calendar — agrega tu Netlify URL en Google Cloud Console → Authorized JavaScript Origins
+    GCAL_CLIENT_ID: '572897240301-uq0hhpse3ioddl9g5cpqd4cfvgf8rlm1.apps.googleusercontent.com',
+    GCAL_SCOPE: 'https://www.googleapis.com/auth/calendar'
+  }
+
+  /* ═══════════════════════════════════════════════════
+     STATE
+  ═══════════════════════════════════════════════════ */
+  const S = {
+    user: null, partner: null,
+    tab: 'hoy',
+    subTab: { metas:'ahorro', vida:'agenda', cuerpo:'reto', nido:'cariños' },
+    // datos
+    savings: [], habits: [], sparks: [], plans: [],
+    goals: [],        // metas libres
+    fitness: [],      // registros semanales físicos
+    memories: [],     // diario del nido
+    pending: [],      // pendientes juntos
+    notes: [],        // notas secretas
+    mapPins: [],      // pins del mapa
+    habitGoals: [],   // metas de hábitos semanales
+    // google calendar
+    gcalToken: null, gcalEvents: [],
+    // mapa
+    leafletMap: null
+  }
+
+  /* ═══════════════════════════════════════════════════
+     SUPABASE
+  ═══════════════════════════════════════════════════ */
+  let sb = null
+
+  function initSB() {
+    if (CFG.SUPABASE_URL === 'YOUR_SUPABASE_URL') return false
+    try {
+      sb = window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_KEY)
+      return true
+    } catch(e) { console.error(e); return false }
+  }
+  const hasSB = () => !!sb
+
+  /* ═══════════════════════════════════════════════════
+     DATABASE MODULE
+  ═══════════════════════════════════════════════════ */
+  const DB = {
+    async loadAll() {
+      this._fromLocal()
+      if (!hasSB()) return
+      try {
+        const [sv, hb, sp, pl, go, fi, me, pe, no, mp, hg] = await Promise.all([
+          sb.from('nido_savings'    ).select('*').order('created_at', { ascending: false }),
+          sb.from('nido_habits'     ).select('*').order('created_at', { ascending: false }),
+          sb.from('nido_sparks'     ).select('*').order('created_at', { ascending: false }).limit(50),
+          sb.from('nido_plans'      ).select('*').order('plan_date',  { ascending: true  }),
+          sb.from('nido_goals'      ).select('*').order('created_at', { ascending: false }),
+          sb.from('nido_fitness'    ).select('*').order('week_start', { ascending: false }),
+          sb.from('nido_memories'   ).select('*').order('happened_on',{ ascending: false }),
+          sb.from('nido_pending'    ).select('*').order('created_at', { ascending: false }),
+          sb.from('nido_notes'      ).select('*').order('created_at', { ascending: false }),
+          sb.from('nido_map_pins'   ).select('*').order('created_at', { ascending: false }),
+          sb.from('nido_habit_goals').select('*').order('created_at', { ascending: false })
+        ])
+        if (sv.data?.length) S.savings    = sv.data
+        if (hb.data?.length) S.habits     = hb.data
+        if (sp.data?.length) S.sparks     = sp.data
+        if (pl.data?.length) S.plans      = pl.data
+        if (go.data?.length) S.goals      = go.data
+        if (fi.data?.length) S.fitness    = fi.data
+        if (me.data?.length) S.memories   = me.data
+        if (pe.data?.length) S.pending    = pe.data
+        if (no.data?.length) S.notes      = no.data
+        if (mp.data?.length) S.mapPins    = mp.data
+        if (hg.data?.length) S.habitGoals = hg.data
+        this._toLocal()
+      } catch(e) { console.error('Supabase load error:', e) }
+    },
+
+    async saveSaving({ goal_id, amount, note }) {
+      const row = { user_id: S.user, goal_id, amount: parseFloat(amount), note: note||'', created_at: new Date().toISOString() }
+      S.savings.unshift(row)
+      this._toLocal()
+      if (hasSB()) {
+        const { data, error } = await sb.from('nido_savings').insert(row).select()
+        if (error) { console.error('Save error:', error); toast('⚠️ Error al guardar en nube — queda en local', '') }
+        else if (data?.[0]) { S.savings[0] = data[0]; this._toLocal() }
+      }
+    },
+
+    async saveHabit(habit_id) {
+      const row = { user_id: S.user, habit_id, created_at: new Date().toISOString() }
+      S.habits.unshift(row)
+      this._toLocal()
+      if (hasSB()) {
+        const { data, error } = await sb.from('nido_habits').insert(row).select()
+        if (error) { console.error('Save error:', error); toast('⚠️ Error al guardar en nube — queda en local', '') }
+        else if (data?.[0]) { S.habits[0] = data[0]; this._toLocal() }
+      }
+    },
+
+    async saveSpark(message) {
+      const row = { from_user: S.user, to_user: S.partner, message, created_at: new Date().toISOString() }
+      S.sparks.unshift(row)
+      this._toLocal()
+      if (hasSB()) {
+        const { data, error } = await sb.from('nido_sparks').insert(row).select()
+        if (!error && data?.[0]) { S.sparks[0] = data[0]; this._toLocal() }
+      }
+    },
+
+    async savePlan({ title, plan_date, plan_time, note }) {
+      const row = { created_by: S.user, title, plan_date, plan_time: plan_time||'19:00', note: note||'', created_at: new Date().toISOString() }
+      S.plans.push(row)
+      S.plans.sort((a,b) => a.plan_date.localeCompare(b.plan_date))
+      this._toLocal()
+      if (hasSB()) {
+        const { data, error } = await sb.from('nido_plans').insert(row).select()
+        if (error) { console.error('Plan save error:', error) }
+        else if (data?.[0]) {
+          const idx = S.plans.findIndex(p => p === row)
+          if (idx !== -1) S.plans[idx] = data[0]
+          this._toLocal()
+        }
+      }
+    },
+
+    async deletePlan(planId) {
+      S.plans = S.plans.filter(p => p.id !== planId)
+      this._toLocal()
+      if (hasSB()) {
+        await sb.from('nido_plans').delete().eq('id', planId)
+      }
+    },
+
+    async saveGoal({ icon, name, type, target, unit, deadline, note }) {
+      const row = { created_by: S.user, icon: icon||'🎯', name, type, target: target||null, unit: unit||'', deadline: deadline||null, note: note||'', progress: 0, done: false, created_at: new Date().toISOString() }
+      S.goals.unshift(row); this._toLocal()
+      if (hasSB()) {
+        const { data } = await sb.from('nido_goals').insert(row).select()
+        if (data?.[0]) { S.goals[0] = data[0]; this._toLocal() }
+      }
+    },
+
+    async updateGoalProgress(goalId, progress) {
+      const idx = S.goals.findIndex(g => g.id === goalId)
+      if (idx === -1) return
+      const g = S.goals[idx]
+      const done = g.type === 'numeric' ? progress >= (g.target||1) : progress >= 1
+      S.goals[idx] = { ...g, progress, done }; this._toLocal()
+      if (hasSB()) await sb.from('nido_goals').update({ progress, done }).eq('id', goalId)
+    },
+
+    async saveFitness(row) {
+      // row: { user_id, week_start, weight, waist, arm, gym_days, cardio_min, water_avg, sleep_avg, energy, highlight }
+      const existing = S.fitness.find(f => f.user_id === row.user_id && f.week_start === row.week_start)
+      if (existing) {
+        const updated = { ...existing, ...row }
+        S.fitness = S.fitness.map(f => (f.user_id === row.user_id && f.week_start === row.week_start) ? updated : f)
+        this._toLocal()
+        if (hasSB()) await sb.from('nido_fitness').update(row).eq('id', existing.id)
+      } else {
+        const newRow = { ...row, created_at: new Date().toISOString() }
+        S.fitness.unshift(newRow); this._toLocal()
+        if (hasSB()) {
+          const { data } = await sb.from('nido_fitness').insert(newRow).select()
+          if (data?.[0]) { S.fitness[0] = data[0]; this._toLocal() }
+        }
+      }
+    },
+
+    async saveMemory({ title, text, photo, happened_on }) {
+      const row = { created_by: S.user, title, text: text||'', photo: photo||null, happened_on: happened_on || new Date().toISOString().slice(0,10), created_at: new Date().toISOString() }
+      S.memories.unshift(row); this._toLocal()
+      if (hasSB()) {
+        const { data } = await sb.from('nido_memories').insert(row).select()
+        if (data?.[0]) { S.memories[0] = data[0]; this._toLocal() }
+      }
+    },
+
+    async savePending({ icon, name, type, note }) {
+      const row = { created_by: S.user, icon: icon||'📌', name, type, note: note||'', status: 'want', votes: {}, created_at: new Date().toISOString() }
+      S.pending.unshift(row); this._toLocal()
+      if (hasSB()) {
+        const { data } = await sb.from('nido_pending').insert(row).select()
+        if (data?.[0]) { S.pending[0] = data[0]; this._toLocal() }
+      }
+    },
+
+    async updatePendingStatus(id, status) {
+      S.pending = S.pending.map(p => p.id === id ? { ...p, status } : p); this._toLocal()
+      if (hasSB()) await sb.from('nido_pending').update({ status }).eq('id', id)
+    },
+
+    async saveNote(message) {
+      const row = { from_user: S.user, to_user: S.partner, message, read: false, created_at: new Date().toISOString() }
+      S.notes.unshift(row); this._toLocal()
+      if (hasSB()) {
+        const { data } = await sb.from('nido_notes').insert(row).select()
+        if (data?.[0]) { S.notes[0] = data[0]; this._toLocal() }
+      }
+    },
+
+    async saveMapPin({ lat, lng, title, note, emoji }) {
+      const row = { created_by: S.user, lat, lng, title, note: note||'', emoji: emoji||'📍', created_at: new Date().toISOString() }
+      S.mapPins.unshift(row); this._toLocal()
+      if (hasSB()) {
+        const { data } = await sb.from('nido_map_pins').insert(row).select()
+        if (data?.[0]) { S.mapPins[0] = data[0]; this._toLocal() }
+      }
+    },
+
+    async saveHabitGoal({ habit_id, target_days }) {
+      // target_days: cuántos días por semana quieren lograr este hábito
+      const existing = S.habitGoals.find(h => h.habit_id === habit_id)
+      if (existing) {
+        S.habitGoals = S.habitGoals.map(h => h.habit_id === habit_id ? { ...h, target_days } : h); this._toLocal()
+        if (hasSB()) await sb.from('nido_habit_goals').update({ target_days }).eq('id', existing.id)
+      } else {
+        const row = { habit_id, target_days, created_at: new Date().toISOString() }
+        S.habitGoals.push(row); this._toLocal()
+        if (hasSB()) {
+          const { data } = await sb.from('nido_habit_goals').insert(row).select()
+          if (data?.[0]) { S.habitGoals[S.habitGoals.length-1] = data[0]; this._toLocal() }
+        }
+      }
+    },
+
+    _toLocal() {
+      const keys = ['savings','habits','sparks','plans','goals','fitness','memories','pending','notes','mapPins','habitGoals']
+      keys.forEach(k => localStorage.setItem(`nido_${k === 'mapPins' ? 'map_pins' : k}`, JSON.stringify(S[k])))
+    },
+
+    _fromLocal() {
+      const load = (key, storeKey) => JSON.parse(localStorage.getItem(`nido_${key}`) || '[]')
+      S.savings    = load('savings')
+      S.habits     = load('habits')
+      S.sparks     = load('sparks')
+      S.plans      = load('plans')
+      S.goals      = load('goals')
+      S.fitness    = load('fitness')
+      S.memories   = load('memories')
+      S.pending    = load('pending')
+      S.notes      = load('notes')
+      S.mapPins    = load('map_pins')
+      S.habitGoals = load('habitGoals')
+    }
+  }
+
+  /* ═══════════════════════════════════════════════════
+     REALTIME MODULE
+  ═══════════════════════════════════════════════════ */
+  const RT = {
+    chs: [],
+    sub() {
+      if (!hasSB()) return
+
+      const onSaving = (payload) => {
+        const r = payload.new
+        if (S.savings.find(s => s.id === r.id)) return
+        S.savings.unshift(r); DB._toLocal()
+        if (r.user_id === S.partner) {
+          const g = CFG.GOALS[r.goal_id]
+          toast(`${CFG.USERS[S.partner].name} ahorró $${fmt(r.amount)} para ${g?.icon} ${g?.name}! 🪺`, 'hot')
+        }
+        renderCurrent()
+      }
+
+      const onHabit = (payload) => {
+        const r = payload.new
+        if (S.habits.find(h => h.id === r.id)) return
+        S.habits.unshift(r); DB._toLocal()
+        if (r.user_id === S.partner) {
+          const h = CFG.HABITS.find(x => x.id === r.habit_id)
+          toast(`${CFG.USERS[S.partner].name} completó: ${h?.icon} ${h?.name} ⚡`, 'hot')
+        }
+        renderCurrent()
+      }
+
+      const onSpark = (payload) => {
+        const r = payload.new
+        if (S.sparks.find(s => s.id === r.id)) return
+        S.sparks.unshift(r); DB._toLocal()
+        if (r.to_user === S.user) {
+          toast(`💕 ${CFG.USERS[S.partner].name}: "${r.message}"`, 'hot')
+        }
+        renderCurrent()
+      }
+
+      const onGeneric = (table, key, arr) => (payload) => {
+        const r = payload.new
+        if (S[arr].find(x => x.id === r.id)) return
+        S[arr].unshift(r); DB._toLocal()
+        renderCurrent()
+      }
+
+      this.chs = [
+        sb.channel('nido-savings').on('postgres_changes', { event:'INSERT', schema:'public', table:'nido_savings'     }, onSaving ).subscribe(),
+        sb.channel('nido-habits' ).on('postgres_changes', { event:'INSERT', schema:'public', table:'nido_habits'      }, onHabit  ).subscribe(),
+        sb.channel('nido-sparks' ).on('postgres_changes', { event:'INSERT', schema:'public', table:'nido_sparks'      }, onSpark  ).subscribe(),
+        sb.channel('nido-plans'  ).on('postgres_changes', { event:'INSERT', schema:'public', table:'nido_plans'       }, (payload) => {
+          const r = payload.new
+          if (S.plans.find(p => p.id === r.id)) return
+          S.plans.push(r); S.plans.sort((a,b) => a.plan_date.localeCompare(b.plan_date))
+          DB._toLocal()
+          if (r.created_by === S.partner) toast(`📅 ${CFG.USERS[S.partner].name} agregó un plan: "${r.title}"`, 'hot')
+          renderCurrent()
+        }).subscribe(),
+        sb.channel('nido-goals'   ).on('postgres_changes', { event:'INSERT', schema:'public', table:'nido_goals'      }, onGeneric('nido_goals',    'id', 'goals'   )).subscribe(),
+        sb.channel('nido-fitness' ).on('postgres_changes', { event:'INSERT', schema:'public', table:'nido_fitness'    }, onGeneric('nido_fitness',  'id', 'fitness'  )).subscribe(),
+        sb.channel('nido-memories').on('postgres_changes', { event:'INSERT', schema:'public', table:'nido_memories'   }, (payload) => {
+          const r = payload.new
+          if (S.memories.find(x => x.id === r.id)) return
+          S.memories.unshift(r); DB._toLocal()
+          if (r.user_id === S.partner) toast(`📸 ${CFG.USERS[S.partner].name} agregó un recuerdo: "${r.title}"`, 'hot')
+          renderCurrent()
+        }).subscribe(),
+        sb.channel('nido-pending' ).on('postgres_changes', { event:'INSERT', schema:'public', table:'nido_pending'    }, onGeneric('nido_pending',  'id', 'pending'  )).subscribe(),
+        sb.channel('nido-notes'   ).on('postgres_changes', { event:'INSERT', schema:'public', table:'nido_notes'      }, (payload) => {
+          const r = payload.new
+          if (S.notes.find(x => x.id === r.id)) return
+          S.notes.unshift(r); DB._toLocal()
+          if (r.to_user === S.user) toast(`💌 ¡Tienes una nota secreta de ${CFG.USERS[S.partner].name}!`, 'hot')
+          renderCurrent()
+        }).subscribe(),
+        sb.channel('nido-map-pins').on('postgres_changes', { event:'INSERT', schema:'public', table:'nido_map_pins'   }, onGeneric('nido_map_pins', 'id', 'mapPins'  )).subscribe(),
+      ]
+    }
+  }
+
+  /* ═══════════════════════════════════════════════════
+     GOOGLE CALENDAR
+  ═══════════════════════════════════════════════════ */
+  const GCAL = {
+    _key: 'nido_gcal_token',
+
+    saveToken(t) {
+      const exp = Date.now() + (t.expires_in || 3600) * 1000
+      localStorage.setItem(this._key, JSON.stringify({ token: t.access_token, exp }))
+      S.gcalToken = t.access_token
+    },
+
+    loadToken() {
+      try {
+        const raw = localStorage.getItem(this._key)
+        if (!raw) return null
+        const { token, exp } = JSON.parse(raw)
+        if (Date.now() > exp) { localStorage.removeItem(this._key); S.gcalToken = null; return null }
+        S.gcalToken = token
+        return token
+      } catch(e) { return null }
+    },
+
+    isConnected() { return !!S.gcalToken },
+
+    connect() {
+      if (!window.google?.accounts?.oauth2) { toast('Google aún cargando, intenta en 2 seg'); return }
+      const client = window.google.accounts.oauth2.initTokenClient({
+        client_id: CFG.GCAL_CLIENT_ID,
+        scope: CFG.GCAL_SCOPE,
+        callback: (resp) => {
+          if (resp.error) { toast('Error al conectar Google Calendar'); return }
+          this.saveToken(resp)
+          toast('📅 Google Calendar conectado ✓', 'ok')
+          this.fetchEvents().then(() => renderCurrent())
+        }
+      })
+      client.requestAccessToken()
+    },
+
+    disconnect() {
+      localStorage.removeItem(this._key)
+      S.gcalToken = null
+      S.gcalEvents = []
+      renderCurrent()
+    },
+
+    async fetchEvents() {
+      if (!S.gcalToken) return
+      const now   = new Date()
+      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
+      const end   = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 14, 23, 59).toISOString()
+      try {
+        const res = await fetch(
+          `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${start}&timeMax=${end}&singleEvents=true&orderBy=startTime&maxResults=20`,
+          { headers: { Authorization: `Bearer ${S.gcalToken}` } }
+        )
+        if (!res.ok) { if (res.status === 401) this.disconnect(); return }
+        const data = await res.json()
+        S.gcalEvents = data.items || []
+        localStorage.setItem('nido_gcal_events', JSON.stringify(S.gcalEvents))
+      } catch(e) { console.error('GCal fetch error:', e) }
+    },
+
+    async createEvent({ title, date, time, note }) {
+      if (!S.gcalToken) return false
+      const startDT = `${date}T${time || '19:00'}:00`
+      const [h, m]  = (time || '19:00').split(':').map(Number)
+      const endH    = String(h + 1).padStart(2,'0')
+      const endDT   = `${date}T${endH}:${String(m).padStart(2,'0')}:00`
+      try {
+        const res = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${S.gcalToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            summary: `🪺 ${title}`,
+            description: note || 'Plan de Nido',
+            start: { dateTime: startDT, timeZone: 'America/Mexico_City' },
+            end:   { dateTime: endDT,   timeZone: 'America/Mexico_City' },
+            reminders: { useDefault: false, overrides: [{ method: 'popup', minutes: 60 }] }
+          })
+        })
+        return res.ok
+      } catch(e) { return false }
+    },
+
+    fmtTime(iso) {
+      if (!iso) return ''
+      const d = new Date(iso)
+      return d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
+    },
+
+    fmtEventDate(iso) {
+      const d = new Date(iso)
+      return d.toLocaleDateString('es-MX', { weekday:'short', day:'numeric', month:'short' })
+    }
+  }
+
+  /* ═══════════════════════════════════════════════════
+     CALCULATIONS
+  ═══════════════════════════════════════════════════ */
+  function weekBounds() {
+    const now = new Date(), d = now.getDay()
+    const mon = new Date(now)
+    mon.setDate(now.getDate() - (d === 0 ? 6 : d - 1))
+    mon.setHours(0,0,0,0)
+    const sun = new Date(mon)
+    sun.setDate(mon.getDate() + 6)
+    sun.setHours(23,59,59,999)
+    return { mon, sun }
+  }
+
+  function weekScore(userId) {
+    const { mon, sun } = weekBounds()
+    const inWeek = (iso) => { const d = new Date(iso); return d >= mon && d <= sun }
+
+    const sv = S.savings.filter(s => s.user_id === userId && inWeek(s.created_at))
+    const hb = S.habits .filter(h => h.user_id === userId && inWeek(h.created_at))
+    const sp = S.sparks .filter(s => s.from_user === userId && inWeek(s.created_at))
+
+    const savTotal  = sv.reduce((a,s) => a + (s.amount||0), 0)
+    const savPts    = Math.floor(savTotal / 100) * CFG.SCORE.PER_100
+    const habPts    = hb.length * CFG.SCORE.PER_HABIT
+    const sparkPts  = sp.length * CFG.SCORE.PER_SPARK
+
+    return { total: savPts+habPts+sparkPts, savTotal, savPts, habPts, sparkPts, habCount: hb.length, sparkCount: sp.length }
+  }
+
+  function goalTotal(goalId, userId=null) {
+    return S.savings
+      .filter(s => s.goal_id === goalId && (userId === null || s.user_id === userId))
+      .reduce((a,s) => a+(s.amount||0), 0)
+  }
+
+  function todayFeed() {
+    const start = new Date(); start.setHours(0,0,0,0)
+    const all = [
+      ...S.savings.filter(s => new Date(s.created_at) >= start).map(s => ({
+        type:'saving', uid: s.user_id,
+        text: `ahorró $${fmt(s.amount)} para ${CFG.GOALS[s.goal_id]?.name || s.goal_id}`,
+        icon: CFG.GOALS[s.goal_id]?.icon || '💰', ts: s.created_at
+      })),
+      ...S.habits.filter(h => new Date(h.created_at) >= start).map(h => {
+        const hb = CFG.HABITS.find(x => x.id === h.habit_id)
+        return { type:'habit', uid: h.user_id, text:`completó ${hb?.name||h.habit_id}`, icon: hb?.icon||'✅', ts: h.created_at }
+      }),
+      ...S.sparks.filter(s => new Date(s.created_at) >= start).map(s => ({
+        type:'spark', uid: s.from_user,
+        text: `mandó una 💕: "${s.message}"`, icon:'💕', ts: s.created_at
+      }))
+    ]
+    return all.sort((a,b) => new Date(b.ts) - new Date(a.ts))
+  }
+
+  /* ═══════════════════════════════════════════════════
+     HELPERS
+  ═══════════════════════════════════════════════════ */
+  function fmt(n) { return new Intl.NumberFormat('es-MX').format(Math.round(n||0)) }
+
+  function ago(iso) {
+    const m = Math.floor((Date.now() - new Date(iso)) / 60000)
+    if (m < 1) return 'justo ahora'
+    if (m < 60) return `hace ${m} min`
+    const h = Math.floor(m/60)
+    if (h < 24) return `hace ${h}h`
+    return `hace ${Math.floor(h/24)}d`
+  }
+
+  function greeting() {
+    const h = new Date().getHours()
+    return h < 12 ? 'Buenos días' : h < 18 ? 'Buenas tardes' : 'Buenas noches'
+  }
+
+  function fmtDate(d) {
+    return new Intl.DateTimeFormat('es-MX', { weekday:'long', day:'numeric', month:'long' }).format(d)
+  }
+
+  let _tt = null
+  function toast(msg, type='') {
+    const el = document.getElementById('toast')
+    el.textContent = msg
+    el.className = type ? `show ${type}` : 'show'
+    clearTimeout(_tt)
+    _tt = setTimeout(() => { el.className = '' }, 3600)
+  }
+
+  /* ═══════════════════════════════════════════════════
+     RENDER — HOY
+  ═══════════════════════════════════════════════════ */
+  function renderHoy() {
+    const me   = CFG.USERS[S.user]
+    const them = CFG.USERS[S.partner]
+    const myW  = weekScore(S.user)
+    const thW  = weekScore(S.partner)
+    const winning = myW.total >= thW.total
+    const feed    = todayFeed()
+
+    const partLast = feed.filter(f => f.uid === S.partner)[0]
+    const partStat = partLast
+      ? `${them.name} ${partLast.text} (${ago(partLast.ts)})`
+      : `${them.name} aún no ha registrado nada hoy`
+
+    const feedHtml = feed.length === 0
+      ? `<div class="empty"><div class="ei">🌸</div><p>Todavía no hay actividad hoy.<br>¡Sean los primeros!</p></div>`
+      : feed.slice(0,12).map(f => {
+          const u = CFG.USERS[f.uid]
+          return `<div class="feed-item fade-up">
+            <div class="feed-av" style="background:${u.bg}">${u.emoji}</div>
+            <div style="flex:1">
+              <div class="feed-name">${u.name}</div>
+              <div class="feed-desc">${f.text}</div>
+            </div>
+            <div class="feed-time">${ago(f.ts)}</div>
+          </div>`
+        }).join('')
+
+    document.getElementById('tab-content').innerHTML = `
+      <div class="page">
+        <div class="page-header">
+          <div>
+            <div style="font-size:13px;color:var(--text-muted)">${greeting()},</div>
+            <div class="page-title" style="display:flex;align-items:center;gap:8px">
+              ${me.name} ${me.emoji}
+              <span class="sync-dot ${hasSB() ? '' : 'off'}" title="${hasSB() ? 'Toca para sincronizar' : 'Sin sync'}" onclick="manualSync()" style="cursor:pointer"></span>
+            </div>
+          </div>
+          <div style="font-size:12px;color:var(--text-muted);text-align:right">${fmtDate(new Date())}</div>
+        </div>
+
+        <!-- Partner banner -->
+        <div class="grad-card" style="display:flex;align-items:center;gap:14px">
+          <div style="width:48px;height:48px;background:rgba(255,255,255,.2);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0">${them.emoji}</div>
+          <div>
+            <div style="font-size:16px;font-weight:700">${them.name} 💕</div>
+            <div style="font-size:13px;opacity:.85">${partStat}</div>
+          </div>
+        </div>
+
+        <!-- Mini score -->
+        <div class="stats-row">
+          <div class="stat-box">
+            <div class="stat-val">${myW.total}</div>
+            <div class="stat-lbl">Mis pts</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-val">${winning ? '👑' : '🏃'}</div>
+            <div class="stat-lbl">${winning ? 'Ganando' : '¡Sigue!'}</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-val">${thW.total}</div>
+            <div class="stat-lbl">Pts de ${them.name}</div>
+          </div>
+        </div>
+
+        <!-- Spark btn -->
+        <button class="btn-primary" style="margin-bottom:14px" onclick="openSpark()">
+          💕 Mandar cariño a ${them.name}
+        </button>
+
+        <!-- Feed -->
+        <div class="card">
+          <div class="card-label">Actividad de hoy</div>
+          ${feedHtml}
+        </div>
+      </div>`
+  }
+
+  /* ═══════════════════════════════════════════════════
+     RENDER — METAS (ahorro + metas libres)
+  ═══════════════════════════════════════════════════ */
+  function renderMetas() {
+    const sub = S.subTab.metas
+    const tabs = subTabsHtml('metas', [
+      { id:'ahorro', label:'💰 Ahorro' },
+      { id:'libres', label:'🎯 Metas libres' }
+    ])
+    if (sub === 'ahorro') { renderAhorro(tabs); return }
+    // ── Metas libres ──
+    const typeIcon = { numeric:'📊', checklist:'✅', binary:'🎯' }
+    const goalsHtml = S.goals.length === 0
+      ? `<div class="empty"><div class="ei">🎯</div><p>No hay metas todavía.<br>¡Agrega la primera!</p></div>`
+      : S.goals.map(g => {
+          const pct = g.type === 'numeric' && g.target
+            ? Math.min(Math.round((g.progress||0) / g.target * 100), 100)
+            : g.done ? 100 : Math.min(Math.round((g.progress||0)*100), 100)
+          const creator = CFG.USERS[g.created_by]
+          return `<div class="goal-card ${g.done?'done':''}">
+            <div style="display:flex;align-items:flex-start;gap:12px">
+              <div class="goal-icon">${g.icon||'🎯'}</div>
+              <div style="flex:1">
+                <div class="goal-name">${g.name} ${g.done?'✅':''}</div>
+                <div class="goal-meta">${creator?.emoji} ${creator?.name}${g.deadline ? ' · 📅 '+fmtPlanDate(g.deadline) : ''}${g.unit ? ' · '+g.unit : ''}</div>
+                ${g.type === 'numeric' && g.target ? `
+                  <div style="margin-top:8px">
+                    <div class="progress-wrap"><div class="progress-fill" style="width:${pct}%"></div></div>
+                    <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted);margin-top:4px">
+                      <span>${g.progress||0} / ${g.target}${g.unit?' '+g.unit:''}</span><span>${pct}%</span>
+                    </div>
+                  </div>` : ''}
+              </div>
+              ${!g.done ? `<button onclick="openGoalProgress('${g.id}')" style="background:var(--rose-ghost);border:1px solid var(--border);border-radius:8px;padding:4px 10px;font-size:12px;font-weight:600;color:var(--rose);cursor:pointer;flex-shrink:0">+</button>` : ''}
+            </div>
+          </div>`
+        }).join('')
+
+    document.getElementById('tab-content').innerHTML = `
+      <div class="page">
+        <div class="page-header">
+          <div class="page-title">Metas 🎯</div>
+        </div>
+        ${tabs}
+        ${goalsHtml}
+        <button class="btn-primary" onclick="openAddGoal()">🎯 + Nueva meta</button>
+      </div>`
+  }
+
+  /* ═══════════════════════════════════════════════════
+     RENDER — AHORRO
+  ═══════════════════════════════════════════════════ */
+  function renderAhorro(tabs='') {
+    const eurT  = goalTotal('europa')
+    const eurA  = goalTotal('europa','alonso')
+    const eurL  = goalTotal('europa','lila')
+    const perT  = goalTotal('perro')
+    const perA  = goalTotal('perro','alonso')
+    const perL  = goalTotal('perro','lila')
+    const perMin = CFG.GOALS.perro.target
+    const perMax = CFG.GOALS.perro.targetMax
+    const perPct = Math.min((perT / perMin) * 100, 100)
+
+    const histHtml = S.savings.length === 0
+      ? `<div class="empty"><div class="ei">💰</div><p>Aún no hay ahorros. ¡Empiecen juntos!</p></div>`
+      : S.savings.slice(0,20).map(s => {
+          const u = CFG.USERS[s.user_id]
+          const g = CFG.GOALS[s.goal_id]
+          return `<div class="save-item">
+            <div class="save-left">
+              <div class="save-av">${u?.emoji||'?'}</div>
+              <div>
+                <div class="save-name">${u?.name||s.user_id} · ${g?.icon||''} ${g?.name||s.goal_id}</div>
+                <div class="save-meta">${s.note ? s.note+' · ' : ''}${ago(s.created_at)}</div>
+              </div>
+            </div>
+            <div class="save-amount">+$${fmt(s.amount)}</div>
+          </div>`
+        }).join('')
+
+    document.getElementById('tab-content').innerHTML = `
+      <div class="page">
+        <div class="page-header">
+          <div class="page-title">Ahorro juntos 💰</div>
+          <button class="btn-ghost" onclick="openLog('ahorro')">+ Agregar</button>
+        </div>
+
+        <!-- Europa -->
+        <div class="card">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+            <div style="font-size:34px">✈️</div>
+            <div>
+              <div style="font-size:17px;font-weight:700">Viaje a Europa</div>
+              <div style="font-size:12px;color:var(--text-muted)">¡Sin límite — a lo que lleguen!</div>
+            </div>
+          </div>
+          <div style="font-size:34px;font-weight:700;color:var(--rose)">$${fmt(eurT)} <span style="font-size:15px;font-weight:400;color:var(--text-muted)">MXN</span></div>
+          <div style="font-size:12px;color:var(--text-muted);margin:4px 0 12px">Total ahorrado entre los dos</div>
+          <div style="display:flex;gap:10px">
+            <div class="chip">👨 Alonso $${fmt(eurA)}</div>
+            <div class="chip">👩 Lila $${fmt(eurL)}</div>
+          </div>
+        </div>
+
+        <!-- Perro -->
+        <div class="card">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+            <div style="font-size:34px">🐾</div>
+            <div>
+              <div style="font-size:17px;font-weight:700">Nuestro perro</div>
+              <div style="font-size:12px;color:var(--text-muted)">Meta: $${fmt(perMin)} – $${fmt(perMax)} MXN</div>
+            </div>
+          </div>
+          <div style="font-size:34px;font-weight:700;color:var(--rose)">$${fmt(perT)} <span style="font-size:15px;font-weight:400;color:var(--text-muted)">MXN</span></div>
+          <div class="progress-wrap" style="margin:10px 0 6px">
+            <div class="progress-fill" style="width:${Math.max(perPct,0)}%"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted);margin-bottom:12px">
+            <span>${Math.round(perPct)}% del mínimo</span>
+            <span>${perPct >= 100 ? '🎉 ¡Listo para el perrito!' : `Faltan $${fmt(Math.max(perMin-perT,0))}`}</span>
+          </div>
+          <div style="display:flex;gap:10px">
+            <div class="chip">👨 Alonso $${fmt(perA)}</div>
+            <div class="chip">👩 Lila $${fmt(perL)}</div>
+          </div>
+        </div>
+
+        <!-- Historial -->
+        <div class="card">
+          <div class="card-label">Historial</div>
+          ${histHtml}
+        </div>
+      </div>`
+  }
+
+  /* ═══════════════════════════════════════════════════
+     RENDER — RETOS
+  ═══════════════════════════════════════════════════ */
+  function renderRetos() {
+    const { mon, sun } = weekBounds()
+    const me   = CFG.USERS[S.user]
+    const them = CFG.USERS[S.partner]
+    const myW  = weekScore(S.user)
+    const thW  = weekScore(S.partner)
+
+    const myLead = myW.total > thW.total
+    const tied   = myW.total === thW.total
+    const banner = tied
+      ? '¡Van empatados! Cualquiera puede ganar 🔥'
+      : `${(myLead ? me : them).name} va ganando esta semana 👑`
+
+    const weekLabel = `${mon.getDate()}/${mon.getMonth()+1} — ${sun.getDate()}/${sun.getMonth()+1}`
+
+    const breakdown = (score, ucfg) => `
+      <div class="score-row"><div class="score-icon">💰</div><div class="score-lbl">Ahorro ($${fmt(score.savTotal)})</div><div class="score-pts">+${score.savPts}</div></div>
+      <div class="score-row"><div class="score-icon">✅</div><div class="score-lbl">Hábitos (${score.habCount})</div><div class="score-pts">+${score.habPts}</div></div>
+      <div class="score-row"><div class="score-icon">💕</div><div class="score-lbl">Cariños enviados (${score.sparkCount})</div><div class="score-pts">+${score.sparkPts}</div></div>`
+
+    document.getElementById('tab-content').innerHTML = `
+      <div class="page">
+        <div class="page-header">
+          <div class="page-title">Retos ⚡</div>
+          <div style="font-size:12px;color:var(--text-muted)">${weekLabel}</div>
+        </div>
+
+        <!-- VS -->
+        <div class="grad-card">
+          <div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;opacity:.7;text-align:center">Semana en curso</div>
+          <div class="vs-row">
+            <div class="vs-player">
+              <div class="vs-player-em">${me.emoji}</div>
+              <div class="vs-player-name">${me.name} ${myLead&&!tied?'👑':''}</div>
+              <div class="vs-player-score">${myW.total}</div>
+            </div>
+            <div class="vs-sep">VS</div>
+            <div class="vs-player">
+              <div class="vs-player-em">${them.emoji}</div>
+              <div class="vs-player-name">${them.name} ${!myLead&&!tied?'👑':''}</div>
+              <div class="vs-player-score">${thW.total}</div>
+            </div>
+          </div>
+          <div class="vs-banner">${banner}</div>
+        </div>
+
+        <!-- Premio -->
+        <div class="card" style="border:2px solid var(--rose-pale)">
+          <div class="card-label">🏆 Premio en juego</div>
+          <div style="font-size:16px;font-weight:700;margin-bottom:4px">El ganador elige...</div>
+          <div style="font-size:14px;color:var(--text-muted)">El plan del fin de semana o en qué gastar su siguiente presupuesto juntos</div>
+        </div>
+
+        <!-- Cómo se gana -->
+        <div class="card">
+          <div class="card-label">¿Cómo se ganan puntos?</div>
+          <div class="score-row"><div class="score-icon">💰</div><div class="score-lbl">Cada $100 ahorrados</div><div class="score-pts">+1 pt</div></div>
+          <div class="score-row"><div class="score-icon">✅</div><div class="score-lbl">Cada hábito completado</div><div class="score-pts">+5 pts</div></div>
+          <div class="score-row"><div class="score-icon">💕</div><div class="score-lbl">Cada cariño enviado</div><div class="score-pts">+2 pts</div></div>
+        </div>
+
+        <!-- Mis pts -->
+        <div class="card">
+          <div class="card-label">Desglose — ${me.name}</div>
+          ${breakdown(myW, me)}
+        </div>
+
+        <!-- Sus pts -->
+        <div class="card">
+          <div class="card-label">Desglose — ${them.name}</div>
+          ${breakdown(thW, them)}
+        </div>
+      </div>`
+  }
+
+  /* ═══════════════════════════════════════════════════
+     RENDER — PLANES + CALENDARIO
+  ═══════════════════════════════════════════════════ */
+  function renderPlanes() {
+    const today     = new Date().toISOString().slice(0,10)
+    const upcoming  = S.plans.filter(p => p.plan_date >= today)
+    const past      = S.plans.filter(p => p.plan_date < today).reverse().slice(0,5)
+    const gcalConn  = GCAL.isConnected()
+    const me        = CFG.USERS[S.user]
+    const them      = CFG.USERS[S.partner]
+
+    function planCard(p) {
+      const creator = CFG.USERS[p.created_by]
+      const isPast  = p.plan_date < today
+      return `
+        <div style="background:var(--warm-white);border-radius:14px;padding:16px;box-shadow:var(--shadow);margin-bottom:10px;border-left:4px solid ${isPast ? 'var(--border)' : 'var(--rose)'}">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+            <div style="flex:1">
+              <div style="font-size:15px;font-weight:700;color:${isPast ? 'var(--text-muted)' : 'var(--text)'}">${p.title}</div>
+              <div style="font-size:12px;color:var(--text-muted);margin-top:3px">
+                📅 ${fmtPlanDate(p.plan_date)} · ⏰ ${p.plan_time || '19:00'} · ${creator?.emoji} ${creator?.name}
+              </div>
+              ${p.note ? `<div style="font-size:12px;color:var(--text-muted);margin-top:4px">${p.note}</div>` : ''}
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+              ${!isPast && gcalConn ? `<button onclick="addPlanToCalendar('${p.id}')" style="background:var(--rose-ghost);border:1px solid var(--border);border-radius:8px;padding:4px 10px;font-size:11px;font-weight:600;color:var(--rose);cursor:pointer;white-space:nowrap">+ Cal</button>` : ''}
+              ${p.id ? `<button onclick="deletePlan('${p.id}')" style="background:none;border:none;font-size:18px;cursor:pointer;opacity:.4;padding:0">🗑</button>` : ''}
+            </div>
+          </div>
+        </div>`
+    }
+
+    // Google Calendar events (next 14 days)
+    const eventsHtml = !gcalConn
+      ? `<div style="text-align:center;padding:16px 0">
+           <button class="btn-primary" onclick="GCAL.connect()">📅 Conectar Google Calendar</button>
+           <p style="font-size:12px;color:var(--text-muted);margin-top:10px">Conecta tu calendario para ver tus eventos y agregar planes automáticamente</p>
+         </div>`
+      : S.gcalEvents.length === 0
+        ? `<div class="empty"><p>No hay eventos en los próximos 14 días</p></div>`
+        : S.gcalEvents.map(ev => {
+            const start = ev.start?.dateTime || ev.start?.date
+            const isAllDay = !ev.start?.dateTime
+            return `
+              <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">
+                <div style="width:38px;height:38px;background:var(--rose-pale);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">📅</div>
+                <div style="flex:1">
+                  <div style="font-size:13px;font-weight:600">${ev.summary || 'Sin título'}</div>
+                  <div style="font-size:12px;color:var(--text-muted)">${isAllDay ? fmtPlanDate(ev.start.date) : GCAL.fmtEventDate(start) + ' · ' + GCAL.fmtTime(start)}</div>
+                </div>
+              </div>`
+          }).join('')
+
+    document.getElementById('tab-content').innerHTML = `
+      <div class="page">
+        <div class="page-header">
+          <div class="page-title">Planes 📅</div>
+          <button class="btn-ghost" onclick="openAddPlan()">+ Agregar</button>
+        </div>
+
+        <!-- Próximos planes -->
+        <div style="margin-bottom:14px">
+          <div class="card-label" style="margin-bottom:10px">PRÓXIMOS PLANES</div>
+          ${upcoming.length === 0
+            ? `<div class="empty"><div class="ei">🗓</div><p>No hay planes todavía.<br>¡Planeen algo juntos!</p></div>`
+            : upcoming.map(planCard).join('')}
+          <button class="btn-primary" onclick="openAddPlan()">📅 + Nuevo plan</button>
+        </div>
+
+        <!-- Retos mini (score semanal) -->
+        <div class="card" style="background:linear-gradient(135deg,rgba(55,30,80,.9),rgba(194,24,91,.8));color:#fff">
+          <div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;opacity:.7;margin-bottom:10px">Reto semanal ⚡</div>
+          <div style="display:flex;align-items:center;justify-content:space-around">
+            <div style="text-align:center">
+              <div style="font-size:28px;font-weight:700">${weekScore(S.user).total}</div>
+              <div style="font-size:12px;opacity:.8">${me.emoji} ${me.name}</div>
+            </div>
+            <div style="font-size:14px;opacity:.5">VS</div>
+            <div style="text-align:center">
+              <div style="font-size:28px;font-weight:700">${weekScore(S.partner).total}</div>
+              <div style="font-size:12px;opacity:.8">${them.emoji} ${them.name}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Google Calendar -->
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+            <div class="card-label" style="margin-bottom:0">MI GOOGLE CALENDAR</div>
+            ${gcalConn ? `
+              <div style="display:flex;gap:8px">
+                <button onclick="GCAL.fetchEvents().then(renderCurrent)" style="background:var(--rose-ghost);border:1px solid var(--border);border-radius:8px;padding:4px 10px;font-size:12px;font-weight:600;color:var(--rose);cursor:pointer">↻</button>
+                <button onclick="GCAL.disconnect()" style="background:none;border:none;font-size:12px;color:var(--text-muted);cursor:pointer">Desconectar</button>
+              </div>` : ''}
+          </div>
+          ${eventsHtml}
+        </div>
+
+        <!-- Planes pasados -->
+        ${past.length > 0 ? `
+          <div class="card">
+            <div class="card-label">PLANES PASADOS</div>
+            ${past.map(planCard).join('')}
+          </div>` : ''}
+      </div>`
+  }
+
+  function fmtPlanDate(dateStr) {
+    const [y,m,d] = dateStr.split('-').map(Number)
+    return new Date(y,m-1,d).toLocaleDateString('es-MX', { weekday:'short', day:'numeric', month:'long' })
+  }
+
+  async function addPlanToCalendar(planId) {
+    const plan = S.plans.find(p => p.id === planId)
+    if (!plan) return
+    const ok = await GCAL.createEvent({ title: plan.title, date: plan.plan_date, time: plan.plan_time, note: plan.note })
+    toast(ok ? '📅 Agregado a tu Google Calendar ✓' : 'Error al agregar al calendario', ok ? 'ok' : '')
+  }
+
+  async function deletePlan(planId) {
+    if (!confirm('¿Eliminar este plan?')) return
+    await DB.deletePlan(planId)
+    renderCurrent()
+    toast('Plan eliminado', '')
+  }
+
+  function openAddPlan() {
+    document.getElementById('sheet-body').innerHTML = `
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">📅 Nuevo plan</div>
+      <div class="form-group">
+        <label class="form-label">¿Qué van a hacer?</label>
+        <input type="text" class="form-input" id="pl-title" placeholder="ej. Cena en Sonora Grill, Película en casa..." />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Fecha</label>
+        <input type="date" class="form-input" id="pl-date" value="${new Date().toISOString().slice(0,10)}" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Hora</label>
+        <input type="time" class="form-input" id="pl-time" value="19:00" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Nota (opcional)</label>
+        <input type="text" class="form-input" id="pl-note" placeholder="ej. Reservación a nombre de Alonso" />
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
+        <input type="checkbox" id="pl-gcal" ${GCAL.isConnected() ? 'checked' : 'disabled'} style="width:18px;height:18px;accent-color:var(--rose)" />
+        <label for="pl-gcal" style="font-size:13px;color:${GCAL.isConnected() ? 'var(--text)' : 'var(--text-muted)'};font-weight:600">
+          ${GCAL.isConnected() ? 'Agregar a mi Google Calendar' : 'Conecta Google Calendar para sincronizar'}
+        </label>
+      </div>
+      <button class="btn-primary" onclick="submitPlan()">📅 Guardar plan</button>`
+    document.getElementById('sheet-wrap').classList.add('open')
+  }
+
+  async function submitPlan() {
+    const title    = document.getElementById('pl-title')?.value?.trim()
+    const plan_date = document.getElementById('pl-date')?.value
+    const plan_time = document.getElementById('pl-time')?.value
+    const note     = document.getElementById('pl-note')?.value?.trim()
+    const addCal   = document.getElementById('pl-gcal')?.checked
+
+    if (!title)     { toast('Ponle nombre al plan'); return }
+    if (!plan_date) { toast('Selecciona una fecha'); return }
+
+    await DB.savePlan({ title, plan_date, plan_time, note })
+
+    if (addCal && GCAL.isConnected()) {
+      const ok = await GCAL.createEvent({ title, date: plan_date, time: plan_time, note })
+      if (ok) toast('📅 Plan guardado y en tu Google Calendar ✓', 'ok')
+      else    toast('Plan guardado (error al agregar al calendario)', '')
+    } else {
+      toast('📅 Plan guardado ✓', 'ok')
+    }
+
+    closeSheet()
+    renderCurrent()
+  }
+
+  /* ═══════════════════════════════════════════════════
+     RENDER — VIDA (agenda · pendientes · diario · mapa)
+  ═══════════════════════════════════════════════════ */
+  function renderVida() {
+    const sub  = S.subTab.vida
+    const tabs = subTabsHtml('vida', [
+      { id:'agenda',    label:'🗓 Agenda'    },
+      { id:'pendientes',label:'🎬 Pendientes'},
+      { id:'diario',    label:'📸 Diario'   },
+      { id:'mapa',      label:'🗺 Mapa'     }
+    ])
+
+    if (sub === 'agenda') {
+      // ── Agenda: vista mensual + planes del mes ──
+      const now    = new Date()
+      const year   = now.getFullYear(), month = now.getMonth()
+      const first  = new Date(year, month, 1).getDay() // 0=dom
+      const days   = new Date(year, month+1, 0).getDate()
+      const today  = now.toISOString().slice(0,10)
+      const planDates = new Set(S.plans.map(p => p.plan_date))
+
+      const DOW = ['D','L','M','X','J','V','S']
+      let cal = DOW.map(d => `<div class="cal-hdr">${d}</div>`).join('')
+      // blancos iniciales (semana empieza el lunes)
+      const startDay = first === 0 ? 6 : first - 1
+      for (let i=0; i<startDay; i++) cal += `<div class="cal-day other-month"></div>`
+      for (let d=1; d<=days; d++) {
+        const ds = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`
+        const isToday = ds === today
+        const hasEv   = planDates.has(ds) || S.gcalEvents.some(e => (e.start?.date||e.start?.dateTime||'').startsWith(ds))
+        cal += `<div class="cal-day ${isToday?'today':''} ${hasEv?'has-event':''}" onclick="filterAgendaDay('${ds}')">${d}</div>`
+      }
+
+      const upcoming = S.plans.filter(p => p.plan_date >= today).slice(0,8)
+      const planCards = upcoming.length === 0
+        ? `<div class="empty"><div class="ei">🗓</div><p>No hay planes próximos</p></div>`
+        : upcoming.map(p => {
+            const c = CFG.USERS[p.created_by]
+            return `<div class="card" style="margin-bottom:10px;border-left:3px solid var(--rose)">
+              <div style="font-size:14px;font-weight:700">${p.title}</div>
+              <div style="font-size:12px;color:var(--text-muted);margin-top:3px">📅 ${fmtPlanDate(p.plan_date)} · ⏰ ${p.plan_time||'19:00'} · ${c?.emoji} ${c?.name}</div>
+              ${p.note ? `<div style="font-size:12px;color:var(--text-muted);margin-top:3px">${p.note}</div>` : ''}
+            </div>`
+          }).join('')
+
+      document.getElementById('tab-content').innerHTML = `
+        <div class="page">
+          <div class="page-header"><div class="page-title">Vida juntos 🌸</div><button class="btn-ghost" onclick="openAddPlan()">+ Plan</button></div>
+          ${tabs}
+          <div class="card">
+            <div style="font-size:14px;font-weight:700;text-align:center;margin-bottom:12px">${now.toLocaleDateString('es-MX',{month:'long',year:'numeric'})}</div>
+            <div class="cal-grid">${cal}</div>
+          </div>
+          <div class="card-label" style="margin-top:4px">PRÓXIMOS PLANES</div>
+          ${planCards}
+        </div>`
+      return
+    }
+
+    if (sub === 'pendientes') {
+      // ── Pendientes juntos ──
+      const cats = [
+        { id:'all', label:'Todo' },
+        { id:'pelicula', label:'🎬 Películas' },
+        { id:'serie', label:'📺 Series' },
+        { id:'restaurante', label:'🍽 Restaurantes' },
+        { id:'lugar', label:'🏔 Lugares' }
+      ]
+      const filterSub = S._pendFilter || 'all'
+      const filtered = filterSub === 'all' ? S.pending : S.pending.filter(p => p.type === filterSub)
+      const statusLabel = { want:'Quiero', booked:'Reservado', done:'Fuimos/Vimos' }
+      const statusCls   = { want:'status-want', booked:'status-booked', done:'status-done' }
+      const listHtml = filtered.length === 0
+        ? `<div class="empty"><div class="ei">📌</div><p>Nada por aquí todavía</p></div>`
+        : filtered.map(p => `
+            <div class="pending-card" onclick="cyclePendingStatus('${p.id}')">
+              <div class="pending-icon">${p.icon}</div>
+              <div style="flex:1">
+                <div class="pending-name">${p.name}</div>
+                ${p.note ? `<div class="pending-meta">${p.note}</div>` : ''}
+              </div>
+              <div class="pending-status ${statusCls[p.status]||'status-want'}">${statusLabel[p.status]||'Quiero'}</div>
+            </div>`).join('')
+
+      document.getElementById('tab-content').innerHTML = `
+        <div class="page">
+          <div class="page-header"><div class="page-title">Pendientes 🎬</div></div>
+          ${tabs}
+          <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:10px;-webkit-overflow-scrolling:touch">
+            ${cats.map(c => `<div class="sub-tab ${filterSub===c.id?'active':''}" onclick="S._pendFilter='${c.id}';renderCurrent()">${c.label}</div>`).join('')}
+          </div>
+          ${listHtml}
+          <button class="btn-primary" onclick="openAddPending()">📌 + Agregar</button>
+        </div>`
+      return
+    }
+
+    if (sub === 'diario') {
+      // ── Diario del nido ──
+      const memsHtml = S.memories.length === 0
+        ? `<div class="empty"><div class="ei">📸</div><p>El diario está vacío.<br>¡Agrega su primer recuerdo!</p></div>`
+        : S.memories.map(m => {
+            const c = CFG.USERS[m.created_by]
+            return `<div class="memory-card">
+              ${m.photo ? `<img class="memory-img" src="${m.photo}" alt="recuerdo">` : `<div style="height:8px;background:linear-gradient(135deg,var(--rose-pale),var(--rose-ghost))"></div>`}
+              <div class="memory-body">
+                <div class="memory-title">${m.title}</div>
+                ${m.text ? `<div class="memory-text">${m.text}</div>` : ''}
+                <div class="memory-footer">
+                  <span>${c?.emoji} ${c?.name}</span>
+                  <span>·</span>
+                  <span>${fmtPlanDate(m.happened_on)}</span>
+                </div>
+              </div>
+            </div>`
+          }).join('')
+
+      document.getElementById('tab-content').innerHTML = `
+        <div class="page">
+          <div class="page-header"><div class="page-title">Diario 📸</div></div>
+          ${tabs}
+          ${memsHtml}
+          <button class="btn-primary" onclick="openAddMemory()">📸 + Agregar recuerdo</button>
+        </div>`
+      return
+    }
+
+    // ── Mapa de aventuras ──
+    document.getElementById('tab-content').innerHTML = `
+      <div class="page">
+        <div class="page-header"><div class="page-title">Mapa 🗺</div><button class="btn-ghost" onclick="openAddPin()">+ Pin</button></div>
+        ${tabs}
+        <div id="map-container"></div>
+        <div style="margin-top:14px">
+          ${S.mapPins.length === 0
+            ? `<div class="empty"><p>No hay pins todavía. ¡Marquen sus lugares!</p></div>`
+            : S.mapPins.map(p => `
+                <div class="card" style="margin-bottom:8px;display:flex;align-items:center;gap:12px">
+                  <div style="font-size:24px">${p.emoji||'📍'}</div>
+                  <div><div style="font-size:14px;font-weight:700">${p.title}</div>${p.note?`<div style="font-size:12px;color:var(--text-muted)">${p.note}</div>`:''}</div>
+                </div>`).join('')}
+        </div>
+      </div>`
+    initMap()
+  }
+
+  let _MAP = null
+  function initMap() {
+    setTimeout(() => {
+      const el = document.getElementById('map-container')
+      if (!el) return
+      const center = S.mapPins.length > 0
+        ? [S.mapPins[0].lat, S.mapPins[0].lng]
+        : [19.4326, -99.1332] // CDMX por defecto
+      if (!_MAP) {
+        _MAP = L.map('map-container').setView(center, 12)
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'© OSM', maxZoom:19 }).addTo(_MAP)
+      } else {
+        _MAP.eachLayer(l => { if (l instanceof L.Marker) _MAP.removeLayer(l) })
+      }
+      S.mapPins.forEach(p => {
+        const icon = L.divIcon({ className:'', html:`<div style="font-size:24px">${p.emoji||'📍'}</div>`, iconSize:[30,30], iconAnchor:[15,15] })
+        L.marker([p.lat, p.lng], { icon }).addTo(_MAP).bindPopup(`<b>${p.title}</b><br>${p.note||''}`)
+      })
+      _MAP.invalidateSize()
+    }, 120)
+  }
+
+  /* ═══════════════════════════════════════════════════
+     RENDER — CUERPO (reto físico · hábitos mejorados)
+  ═══════════════════════════════════════════════════ */
+  function renderCuerpo() {
+    const sub  = S.subTab.cuerpo
+    const tabs = subTabsHtml('cuerpo', [
+      { id:'reto',    label:'💪 Reto físico' },
+      { id:'habitos', label:'✅ Hábitos'      }
+    ])
+
+    if (sub === 'habitos') {
+      const { mon } = weekBounds()
+      const daysOfWeek = ['L','M','X','J','V','S','D']
+      const habGoalsHtml = CFG.HABITS.map(h => {
+        const goal = S.habitGoals.find(g => g.habit_id === h.id)
+        const target = goal?.target_days || 0
+        // contar este hábito esta semana por usuario
+        const myCount   = S.habits.filter(x => x.user_id === S.user   && x.habit_id === h.id && new Date(x.created_at) >= mon).length
+        const themCount = S.habits.filter(x => x.user_id === S.partner && x.habit_id === h.id && new Date(x.created_at) >= mon).length
+        const myPct  = target > 0 ? Math.min(Math.round(myCount/target*100),100) : 0
+        const me     = CFG.USERS[S.user]
+        const them   = CFG.USERS[S.partner]
+        return `<div class="habit-goal-card">
+          <div class="habit-goal-header">
+            <div class="habit-goal-icon">${h.icon}</div>
+            <div style="flex:1">
+              <div class="habit-goal-name">${h.name}</div>
+              ${target > 0 ? `<div style="font-size:11px;color:var(--text-muted)">Meta: ${target}x/semana</div>` : `<div style="font-size:11px;color:var(--text-muted)">Sin meta — <button onclick="openSetHabitGoal('${h.id}')" style="background:none;border:none;color:var(--rose);font-weight:600;cursor:pointer;font-size:11px">Configurar</button></div>`}
+            </div>
+            ${target > 0 ? `<div class="habit-goal-pct">${myPct}%</div>` : ''}
+          </div>
+          ${target > 0 ? `<div class="progress-wrap" style="margin-bottom:8px"><div class="progress-fill" style="width:${myPct}%"></div></div>` : ''}
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div style="font-size:12px;color:var(--text-muted)">${me.emoji} ${myCount} · ${them.emoji} ${themCount}</div>
+            <button onclick="openLog('habito')" style="background:var(--rose-ghost);border:1px solid var(--border);border-radius:8px;padding:4px 10px;font-size:12px;font-weight:600;color:var(--rose);cursor:pointer">+ Registrar</button>
+          </div>
+        </div>`
+      }).join('')
+
+      document.getElementById('tab-content').innerHTML = `
+        <div class="page">
+          <div class="page-header"><div class="page-title">Hábitos ✅</div></div>
+          ${tabs}
+          <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">Toca "Configurar" para establecer tu meta semanal de cada hábito</div>
+          ${habGoalsHtml}
+        </div>`
+      return
+    }
+
+    // ── Reto físico ──
+    const me   = CFG.USERS[S.user]
+    const them = CFG.USERS[S.partner]
+    const ws   = weekStart()
+
+    const myLog   = S.fitness.find(f => f.user_id === S.user   && f.week_start === ws)
+    const themLog = S.fitness.find(f => f.user_id === S.partner && f.week_start === ws)
+
+    // Calcular puntos físicos de esta semana
+    const fitnessScore = (log, prevLog) => {
+      if (!log) return 0
+      let pts = 0
+      pts += (log.gym_days||0) * 10
+      if (log.cardio_min >= 150) pts += 15
+      const waterDays = Math.min(log.water_avg||0, 7)
+      pts += waterDays >= 8 ? 21 : Math.floor((waterDays/8)*21)
+      if ((log.sleep_avg||0) >= 7) pts += 14
+      if (prevLog) {
+        const wDiff = (prevLog.weight||0) - (log.weight||0)
+        if (wDiff > 0) pts += Math.floor(wDiff * 8)
+        const cDiff = (prevLog.waist||0) - (log.waist||0)
+        if (cDiff > 0) pts += Math.floor(cDiff * 25)
+        const aDiff = (log.arm||0) - (prevLog.arm||0)
+        if (aDiff > 0) pts += Math.floor(aDiff * 20)
+      }
+      return pts
+    }
+
+    const allWeeks  = [...new Set(S.fitness.map(f => f.week_start))].sort().reverse()
+    const prevWs    = allWeeks.find(w => w < ws)
+    const myPrev    = prevWs ? S.fitness.find(f => f.user_id === S.user   && f.week_start === prevWs) : null
+    const themPrev  = prevWs ? S.fitness.find(f => f.user_id === S.partner && f.week_start === prevWs) : null
+
+    const myFPts    = fitnessScore(myLog, myPrev)
+    const themFPts  = fitnessScore(themLog, themPrev)
+    const myLeads   = myFPts >= themFPts
+
+    const metrics = [
+      { icon:'⚖️', lbl:'Peso (kg)',      key:'weight',    unit:'kg' },
+      { icon:'📏', lbl:'Cintura (cm)',    key:'waist',     unit:'cm' },
+      { icon:'💪', lbl:'Brazo (cm)',      key:'arm',       unit:'cm', higher:true },
+      { icon:'🏋️', lbl:'Días de gym',    key:'gym_days',  unit:'días', higher:true },
+      { icon:'🏃', lbl:'Cardio (min)',    key:'cardio_min',unit:'min', higher:true },
+      { icon:'💧', lbl:'Agua (vasos/día)',key:'water_avg', unit:'v/d', higher:true },
+      { icon:'😴', lbl:'Sueño (h/día)',   key:'sleep_avg', unit:'h',  higher:true },
+      { icon:'⚡', lbl:'Energía (1-5)',   key:'energy',    unit:'⭐', higher:true }
+    ]
+
+    const metricsHtml = metrics.map(m => {
+      const mv = myLog?.[m.key], tv = themLog?.[m.key]
+      const myWins = mv != null && tv != null
+        ? (m.higher ? mv > tv : mv < tv) : null
+      return `<div class="metric-row">
+        <div class="metric-icon">${m.icon}</div>
+        <div class="metric-lbl">${m.lbl}</div>
+        <div class="metric-vals">
+          <div class="metric-val" style="color:${myWins===true?'#388E3C':myWins===false?'#C2185B':'var(--text)'}">${mv!=null?mv+' '+m.unit:'—'}</div>
+          <div class="metric-winner">${myWins===true?'👑':myWins===false?'':''}</div>
+          <div class="metric-val" style="color:${myWins===false?'#388E3C':myWins===true?'#C2185B':'var(--text)'}">${tv!=null?tv+' '+m.unit:'—'}</div>
+        </div>
+      </div>`
+    }).join('')
+
+    // Gráfica SVG de peso (últimas 8 semanas)
+    const weightData = allWeeks.slice(0,8).reverse().map(w => ({
+      w,
+      my:   S.fitness.find(f => f.user_id===S.user    && f.week_start===w)?.weight || null,
+      them: S.fitness.find(f => f.user_id===S.partner && f.week_start===w)?.weight || null
+    }))
+    const allWeights = weightData.flatMap(d => [d.my, d.them]).filter(v => v!=null)
+    const minW = allWeights.length ? Math.min(...allWeights)-2 : 50
+    const maxW = allWeights.length ? Math.max(...allWeights)+2 : 100
+    const W = 300, H = 100, PAD = 10
+    const xStep = allWeights.length > 1 ? (W - PAD*2) / (weightData.length-1) : W-PAD*2
+    const yScale = v => PAD + (H-PAD*2) * (1 - (v-minW)/(maxW-minW))
+    const ptsMy   = weightData.map((d,i) => d.my   != null ? `${PAD+i*xStep},${yScale(d.my)}`   : null).filter(Boolean)
+    const ptsThem = weightData.map((d,i) => d.them != null ? `${PAD+i*xStep},${yScale(d.them)}` : null).filter(Boolean)
+
+    const svgChart = allWeights.length >= 2 ? `
+      <div class="sparkline-wrap">
+        <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:${H}px">
+          ${ptsMy.length>1?`<polyline points="${ptsMy.join(' ')}" fill="none" stroke="#3949AB" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`:''}
+          ${ptsThem.length>1?`<polyline points="${ptsThem.join(' ')}" fill="none" stroke="#C2185B" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`:''}
+          ${ptsMy.map(p => `<circle cx="${p.split(',')[0]}" cy="${p.split(',')[1]}" r="4" fill="#3949AB"/>`).join('')}
+          ${ptsThem.map(p => `<circle cx="${p.split(',')[0]}" cy="${p.split(',')[1]}" r="4" fill="#C2185B"/>`).join('')}
+        </svg>
+        <div style="display:flex;gap:16px;font-size:11px;margin-top:4px">
+          <span style="color:#3949AB">● ${me.name}</span>
+          <span style="color:#C2185B">● ${them.name}</span>
+        </div>
+      </div>` : `<div style="font-size:12px;color:var(--text-muted);text-align:center;padding:12px">Registren al menos 2 semanas para ver la gráfica</div>`
+
+    document.getElementById('tab-content').innerHTML = `
+      <div class="page">
+        <div class="page-header"><div class="page-title">Cuerpo 💪</div></div>
+        ${tabs}
+
+        <!-- VS Esta semana -->
+        <div class="grad-card">
+          <div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;opacity:.7;text-align:center;margin-bottom:8px">Reto físico — semana actual</div>
+          <div class="fitness-vs">
+            <div class="fitness-player">
+              <div style="font-size:30px">${me.emoji}</div>
+              <div class="fitness-score">${myFPts}</div>
+              <div class="fitness-name">${me.name} ${myLeads&&myFPts>0?'👑':''}</div>
+            </div>
+            <div class="fitness-sep">VS</div>
+            <div class="fitness-player">
+              <div style="font-size:30px">${them.emoji}</div>
+              <div class="fitness-score">${themFPts}</div>
+              <div class="fitness-name">${them.name} ${!myLeads&&themFPts>0?'👑':''}</div>
+            </div>
+          </div>
+          <div class="vs-banner">
+            ${myFPts===0&&themFPts===0 ? '¡Registren esta semana para competir!' :
+              myFPts===themFPts ? '¡Empate! ¿Quién rompe el tie?' :
+              `${(myLeads?me:them).name} va ganando el reto físico 🔥`}
+          </div>
+        </div>
+
+        <!-- Métricas comparativas -->
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+            <div class="card-label" style="margin-bottom:0">COMPARATIVA ESTA SEMANA</div>
+            <div style="font-size:12px;color:var(--text-muted)">${me.emoji} vs ${them.emoji}</div>
+          </div>
+          ${metricsHtml}
+          <button class="btn-primary" style="margin-top:14px" onclick="openFitnessLog()">💪 Registrar mi semana</button>
+        </div>
+
+        <!-- Gráfica de peso -->
+        <div class="card">
+          <div class="card-label">EVOLUCIÓN DE PESO</div>
+          ${svgChart}
+        </div>
+
+        <!-- Puntos: cómo se calculan -->
+        <div class="card">
+          <div class="card-label">¿CÓMO SE CALCULAN LOS PUNTOS?</div>
+          <div class="metric-row"><div class="metric-icon">🏋️</div><div class="metric-lbl">Cada día de gym</div><div style="font-weight:700;color:var(--rose)">+10</div></div>
+          <div class="metric-row"><div class="metric-icon">🏃</div><div class="metric-lbl">150+ min cardio/semana</div><div style="font-weight:700;color:var(--rose)">+15</div></div>
+          <div class="metric-row"><div class="metric-icon">⚖️</div><div class="metric-lbl">Cada kg perdido vs semana ant.</div><div style="font-weight:700;color:var(--rose)">+8</div></div>
+          <div class="metric-row"><div class="metric-icon">📏</div><div class="metric-lbl">Cada cm menos de cintura</div><div style="font-weight:700;color:var(--rose)">+25</div></div>
+          <div class="metric-row"><div class="metric-icon">💪</div><div class="metric-lbl">Cada cm más de brazo</div><div style="font-weight:700;color:var(--rose)">+20</div></div>
+          <div class="metric-row"><div class="metric-icon">💧</div><div class="metric-lbl">8+ vasos de agua/día</div><div style="font-weight:700;color:var(--rose)">+3/día</div></div>
+          <div class="metric-row"><div class="metric-icon">😴</div><div class="metric-lbl">7+ horas de sueño/día</div><div style="font-weight:700;color:var(--rose)">+2/día</div></div>
+        </div>
+      </div>`
+  }
+
+  function weekStart() {
+    const now = new Date(), d = now.getDay()
+    const mon = new Date(now)
+    mon.setDate(now.getDate() - (d === 0 ? 6 : d - 1))
+    mon.setHours(0,0,0,0)
+    return mon.toISOString().slice(0,10)
+  }
+
+  /* ═══════════════════════════════════════════════════
+     RENDER — NIDO (NOSOTROS)
+  ═══════════════════════════════════════════════════ */
+  function renderNido() {
+    const sub  = S.subTab.nido
+    const tabs = subTabsHtml('nido', [
+      { id:'cariños', label:'💕 Cariños'  },
+      { id:'logros',  label:'🏆 Logros'   },
+      { id:'notas',   label:'💌 Notas'    },
+      { id:'config',  label:'⚙️ Config'   }
+    ])
+
+    if (sub === 'cariños') {
+      const aScore = weekScore('alonso'), lScore = weekScore('lila')
+      const total = S.savings.reduce((a,s) => a+(s.amount||0), 0)
+      const sparksHtml = S.sparks.length === 0
+        ? `<div class="empty"><p>No hay cariños aún. ¡Manda el primero!</p></div>`
+        : S.sparks.slice(0,8).map(sp => {
+            const f = CFG.USERS[sp.from_user]
+            return `<div class="spark-item"><div class="spark-from">${f?.emoji||'?'}</div><div class="spark-msg">${f?.name}: "${sp.message}"</div><div class="spark-time">${ago(sp.created_at)}</div></div>`
+          }).join('')
+
+      document.getElementById('tab-content').innerHTML = `
+        <div class="page">
+          <div class="page-header"><div class="page-title">Nuestro nido 🪺</div></div>
+          ${tabs}
+          <div class="profile-duo">
+            <div class="profile-mini"><div class="pm-av">👨</div><div class="pm-name">Alonso</div><div class="pm-score">${aScore.total}</div><div class="pm-lbl">pts esta semana</div></div>
+            <div class="profile-mini"><div class="pm-av">👩</div><div class="pm-name">Lila</div><div class="pm-score">${lScore.total}</div><div class="pm-lbl">pts esta semana</div></div>
+          </div>
+          <div class="card" style="text-align:center;background:linear-gradient(135deg,rgba(194,24,91,.06),rgba(233,30,140,.06))">
+            <div class="card-label">Ahorro total juntos</div>
+            <div style="font-size:42px;font-weight:700;color:var(--rose)">$${fmt(total)} <span style="font-size:14px;font-weight:400;color:var(--text-muted)">MXN</span></div>
+          </div>
+          <div class="card">
+            <div class="card-label">💕 Cariños recientes</div>
+            ${sparksHtml}
+            <button class="btn-primary" style="margin-top:12px" onclick="openSpark()">💕 Mandar cariño</button>
+          </div>
+        </div>`
+      return
+    }
+
+    if (sub === 'logros') {
+      const ACHIEVEMENTS = buildAchievements()
+      const unlocked = ACHIEVEMENTS.filter(a => a.unlocked)
+      const locked   = ACHIEVEMENTS.filter(a => !a.unlocked)
+      document.getElementById('tab-content').innerHTML = `
+        <div class="page">
+          <div class="page-header"><div class="page-title">Logros 🏆</div></div>
+          ${tabs}
+          <div style="font-size:13px;color:var(--text-muted);margin-bottom:12px">${unlocked.length} de ${ACHIEVEMENTS.length} desbloqueados</div>
+          <div class="achievement-grid">
+            ${[...unlocked,...locked].map(a => `
+              <div class="achievement-card ${a.unlocked?'unlocked':'locked'}">
+                <div class="ach-icon">${a.icon}</div>
+                <div class="ach-name">${a.name}</div>
+                <div class="ach-desc">${a.desc}</div>
+                ${a.unlocked ? `<div class="ach-date">✓ Desbloqueado</div>` : ''}
+              </div>`).join('')}
+          </div>
+        </div>`
+      return
+    }
+
+    if (sub === 'notas') {
+      const myNotes   = S.notes.filter(n => n.to_user === S.user)
+      const sentNotes = S.notes.filter(n => n.from_user === S.user)
+      const notesHtml = myNotes.length === 0
+        ? `<div class="empty"><div class="ei">💌</div><p>Aún no tienes notas secretas.<br>${CFG.USERS[S.partner].name} puede dejarte una.</p></div>`
+        : myNotes.map(n => `
+            <div class="note-card">
+              <div class="note-ribbon">Para ti 💕</div>
+              <div class="note-msg">${n.message}</div>
+              <div class="note-from">${CFG.USERS[n.from_user]?.emoji} ${CFG.USERS[n.from_user]?.name} · ${ago(n.created_at)}</div>
+            </div>`).join('')
+
+      document.getElementById('tab-content').innerHTML = `
+        <div class="page">
+          <div class="page-header"><div class="page-title">Notas 💌</div></div>
+          ${tabs}
+          <button class="btn-primary" style="margin-bottom:16px" onclick="openAddNote()">💌 Escribir nota para ${CFG.USERS[S.partner].name}</button>
+          <div class="card-label">NOTAS QUE RECIBISTE</div>
+          ${notesHtml}
+          ${sentNotes.length>0?`<div class="card-label" style="margin-top:14px">TUS NOTAS ENVIADAS</div>${sentNotes.map(n=>`<div class="note-card"><div class="note-ribbon">Enviada</div><div class="note-msg">${n.message}</div><div class="note-from">${ago(n.created_at)}</div></div>`).join('')}`:''}
+        </div>`
+      return
+    }
+
+    // ── Config ──
+    document.getElementById('tab-content').innerHTML = `
+      <div class="page">
+        <div class="page-header"><div class="page-title">Config ⚙️</div></div>
+        ${tabs}
+        <div class="card">
+          <div class="cfg-row">
+            <div><div class="cfg-lbl">Soy</div><div class="cfg-val">${CFG.USERS[S.user].emoji} ${CFG.USERS[S.user].name}</div></div>
+            <button class="btn-ghost" onclick="switchUser()">Cambiar</button>
+          </div>
+          <div class="cfg-row">
+            <div><div class="cfg-lbl">Sync en tiempo real</div><div class="cfg-val">${hasSB() ? '✅ Conectado a Supabase' : '❌ Sin configurar'}</div></div>
+            ${!hasSB() ? `<button class="btn-ghost" onclick="openSBSetup()">Conectar</button>` : ''}
+          </div>
+          <div class="cfg-row">
+            <div><div class="cfg-lbl">Google Calendar</div><div class="cfg-val">${GCAL.isConnected() ? '✅ Conectado' : '❌ Sin conectar'}</div></div>
+            ${GCAL.isConnected() ? `<button class="btn-ghost" onclick="GCAL.disconnect();renderCurrent()">Desconectar</button>` : `<button class="btn-ghost" onclick="GCAL.connect()">Conectar</button>`}
+          </div>
+        </div>
+      </div>`
+  }
+
+  /* ═══════════════════════════════════════════════════
+     LOGROS (ACHIEVEMENTS ENGINE)
+  ═══════════════════════════════════════════════════ */
+  function buildAchievements() {
+    const totalSaved = S.savings.reduce((a,s) => a+(s.amount||0), 0)
+    const totalHabits = S.habits.length
+    const totalSparks = S.sparks.length
+    const totalMemories = S.memories.length
+    const gymDaysAll = S.fitness.reduce((a,f) => a+(f.gym_days||0), 0)
+    const weeksLogged = [...new Set(S.fitness.map(f => f.week_start))].length
+
+    return [
+      { icon:'💰', name:'Primer ahorro', desc:'Guardar por primera vez', unlocked: S.savings.length > 0 },
+      { icon:'🎯', name:'$1,000 juntos',  desc:'Ahorrar $1,000 MXN entre los dos', unlocked: totalSaved >= 1000 },
+      { icon:'✈️', name:'Rumbo a Europa', desc:'Ahorrar $10,000 MXN', unlocked: totalSaved >= 10000 },
+      { icon:'🐾', name:'¡Perrito cerca!', desc:'Ahorrar $15,000 MXN para el perro', unlocked: goalTotal('perro') >= 15000 },
+      { icon:'✅', name:'Primer hábito',  desc:'Registrar tu primer hábito', unlocked: totalHabits > 0 },
+      { icon:'🔥', name:'Semana sana',    desc:'10+ hábitos en una semana', unlocked: (() => { const {mon,sun}=weekBounds(); return S.habits.filter(h=>new Date(h.created_at)>=mon&&new Date(h.created_at)<=sun).length>=10 })() },
+      { icon:'💕', name:'Primer cariño', desc:'Mandarse el primer cariño', unlocked: totalSparks > 0 },
+      { icon:'🌟', name:'Muy cariñosos', desc:'50+ cariños enviados entre los dos', unlocked: totalSparks >= 50 },
+      { icon:'📸', name:'Primer recuerdo', desc:'Agregar su primera memoria al diario', unlocked: totalMemories > 0 },
+      { icon:'📖', name:'Cronistas del amor', desc:'10+ recuerdos en el diario', unlocked: totalMemories >= 10 },
+      { icon:'🏋️', name:'Primer gym',    desc:'Registrar la primera semana física', unlocked: S.fitness.length > 0 },
+      { icon:'💪', name:'Constantes',    desc:'4 semanas registradas en CUERPO', unlocked: weeksLogged >= 4 },
+      { icon:'🗺️', name:'Primer pin',   desc:'Marcar su primer lugar en el mapa', unlocked: S.mapPins.length > 0 },
+      { icon:'🎬', name:'Lista de sueños', desc:'Agregar 5+ pendientes juntos', unlocked: S.pending.length >= 5 },
+      { icon:'🏆', name:'Completamos algo', desc:'Marcar un pendiente como "Fuimos/Vimos"', unlocked: S.pending.some(p=>p.status==='done') },
+      { icon:'🪺', name:'Nido completo', desc:'Usar todas las secciones de la app', unlocked: S.savings.length>0&&S.habits.length>0&&S.plans.length>0&&S.fitness.length>0&&S.memories.length>0 }
+    ]
+  }
+
+  /* ═══════════════════════════════════════════════════
+     LOG SHEET
+  ═══════════════════════════════════════════════════ */
+  let _logType = 'ahorro'
+  let _selHabits = []
+
+  function openLog(type='ahorro') {
+    _logType = type; _selHabits = []
+    renderSheet()
+    document.getElementById('sheet-wrap').classList.add('open')
+  }
+
+  function closeSheet() {
+    document.getElementById('sheet-wrap').classList.remove('open')
+  }
+
+  function renderSheet() {
+    document.getElementById('sheet-body').innerHTML = `
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">¿Qué registras?</div>
+      <div class="log-opts">
+        <div class="log-opt ${_logType==='ahorro'?'sel':''}" onclick="setLogType('ahorro',this)">
+          <div class="lo-icon">💰</div><div class="lo-name">Ahorro</div>
+        </div>
+        <div class="log-opt ${_logType==='habito'?'sel':''}" onclick="setLogType('habito',this)">
+          <div class="lo-icon">✅</div><div class="lo-name">Hábito</div>
+        </div>
+      </div>
+      <div id="log-form">${logForm()}</div>`
+  }
+
+  function setLogType(type, el) {
+    _logType = type; _selHabits = []
+    document.querySelectorAll('.log-opt').forEach(e => e.classList.remove('sel'))
+    el.classList.add('sel')
+    document.getElementById('log-form').innerHTML = logForm()
+  }
+
+  function logForm() {
+    if (_logType === 'ahorro') return `
+      <div class="form-group">
+        <label class="form-label">Meta</label>
+        <select class="form-select" id="lg-goal">
+          <option value="europa">✈️ Viaje a Europa</option>
+          <option value="perro">🐾 Nuestro perro</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Cantidad (MXN)</label>
+        <input type="number" class="form-input" id="lg-amount" placeholder="ej. 500" inputmode="decimal" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Nota (opcional)</label>
+        <input type="text" class="form-input" id="lg-note" placeholder="ej. Quincena" />
+      </div>
+      <button class="btn-primary" onclick="submitLog()">💰 Guardar ahorro</button>`
+
+    if (_logType === 'habito') return `
+      <div class="form-group">
+        <label class="form-label">Selecciona los hábitos de hoy</label>
+        <div class="habit-grid">
+          ${CFG.HABITS.map(h => `
+            <div class="habit-chip" id="hc-${h.id}" onclick="toggleH('${h.id}')">
+              <div class="hc-icon">${h.icon}</div>
+              <div class="hc-name">${h.name}</div>
+            </div>`).join('')}
+        </div>
+      </div>
+      <button class="btn-primary" id="hb-btn" onclick="submitLog()" disabled>✅ Guardar hábitos</button>`
+
+    return ''
+  }
+
+  function toggleH(id) {
+    const i = _selHabits.indexOf(id)
+    if (i === -1) { _selHabits.push(id); document.getElementById(`hc-${id}`).classList.add('sel') }
+    else          { _selHabits.splice(i,1); document.getElementById(`hc-${id}`).classList.remove('sel') }
+    const btn = document.getElementById('hb-btn')
+    if (btn) btn.disabled = _selHabits.length === 0
+  }
+
+  async function submitLog() {
+    if (_logType === 'ahorro') {
+      const amount = parseFloat(document.getElementById('lg-amount').value)
+      if (!amount || amount <= 0) { toast('Ingresa una cantidad válida'); return }
+      const goal_id = document.getElementById('lg-goal').value
+      const note    = document.getElementById('lg-note').value
+      await DB.saveSaving({ goal_id, amount, note })
+      closeSheet()
+      toast(`💰 $${fmt(amount)} guardados para ${CFG.GOALS[goal_id].name}!`, 'ok')
+      renderCurrent()
+      setTimeout(() => {
+        const pts = Math.floor(amount/100)
+        if (pts > 0) toast(`⚡ +${pts} puntos para el reto!`, 'hot')
+      }, 1800)
+    }
+
+    if (_logType === 'habito') {
+      if (_selHabits.length === 0) return
+      for (const id of _selHabits) await DB.saveHabit(id)
+      closeSheet()
+      const pts = _selHabits.length * CFG.SCORE.PER_HABIT
+      toast(`✅ ${_selHabits.length} hábito(s) registrado(s) · +${pts} pts`, 'ok')
+      renderCurrent()
+    }
+  }
+
+  /* ═══════════════════════════════════════════════════
+     SPARK / CARIÑO
+  ═══════════════════════════════════════════════════ */
+  const PRESETS = [
+    '¡Te quiero mucho! 💕',
+    '¡Estás haciendo increíble! 🌟',
+    '¡Somos el mejor equipo! 🔥',
+    '¡Orgulloso/a de ti! ✨',
+    '¡Tú puedes con todo! 💪',
+    '¡Ya casi llegamos a Europa! ✈️',
+    '¡Pronto tendremos al perrito! 🐾',
+    '¡Eres lo mejor de mi vida! 🪺'
+  ]
+
+  function openSpark() {
+    const them = CFG.USERS[S.partner]
+    document.getElementById('sheet-body').innerHTML = `
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">💕 Mandar cariño a ${them.name}</div>
+      ${PRESETS.map(m => `<button class="spark-preset" onclick="sendSpark('${m.replace(/'/g,"\\'")}',this)">${m}</button>`).join('')}
+      <div class="form-group" style="margin-top:8px">
+        <label class="form-label">O escribe algo tuyo</label>
+        <input type="text" class="form-input" id="spark-custom" placeholder="Escribe algo bonito..." />
+      </div>
+      <button class="btn-primary" onclick="sendCustomSpark()">💕 Enviar</button>`
+    document.getElementById('sheet-wrap').classList.add('open')
+  }
+
+  async function sendSpark(msg, btn) {
+    if (btn) btn.style.opacity = '.5'
+    await DB.saveSpark(msg)
+    closeSheet()
+    toast(`💕 ¡Cariño enviado a ${CFG.USERS[S.partner].name}!`, 'hot')
+    renderCurrent()
+  }
+
+  async function sendCustomSpark() {
+    const msg = document.getElementById('spark-custom')?.value?.trim()
+    if (!msg) { toast('Escribe un mensaje primero'); return }
+    await sendSpark(msg, null)
+  }
+
+  /* ═══════════════════════════════════════════════════
+     SUPABASE SETUP SHEET
+  ═══════════════════════════════════════════════════ */
+  function openSBSetup() {
+    document.getElementById('sheet-body').innerHTML = `
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">🔗 Conectar sync</div>
+      <p style="font-size:14px;color:var(--text-muted);margin-bottom:18px;line-height:1.6">
+        Para que Alonso y Lila se vean en tiempo real, crea un proyecto gratis en <strong>supabase.com</strong> y pega las credenciales.
+      </p>
+      <div class="form-group">
+        <label class="form-label">Supabase Project URL</label>
+        <input type="text" class="form-input" id="sb-url" placeholder="https://xxxx.supabase.co" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Anon Public Key</label>
+        <input type="text" class="form-input" id="sb-key" placeholder="eyJhbGci..." />
+      </div>
+      <button class="btn-primary" onclick="saveSBConfig()">Guardar y conectar</button>
+      <div style="margin-top:14px;padding:14px;background:var(--rose-ghost);border-radius:12px;font-size:13px;color:var(--text-muted);line-height:1.8">
+        <strong>Instrucciones:</strong><br>
+        1. supabase.com → New project<br>
+        2. Settings → API → copia URL y anon key<br>
+        3. SQL Editor → corre el script de tablas (en las instrucciones del HTML)
+      </div>`
+    document.getElementById('sheet-wrap').classList.add('open')
+  }
+
+  async function saveSBConfig() {
+    const url = document.getElementById('sb-url')?.value?.trim()
+    const key = document.getElementById('sb-key')?.value?.trim()
+    if (!url || !key) { toast('Llena los dos campos'); return }
+    CFG.SUPABASE_URL = url
+    CFG.SUPABASE_KEY = key
+    localStorage.setItem('nido_sb_url', url)
+    localStorage.setItem('nido_sb_key', key)
+    if (initSB()) {
+      RT.sub()
+      await DB.loadAll()
+      closeSheet()
+      toast('✅ ¡Sync en tiempo real activo!', 'ok')
+      renderCurrent()
+    } else {
+      toast('Error al conectar. Revisa las credenciales')
+    }
+  }
+
+  /* ═══════════════════════════════════════════════════
+     NAVIGATION
+  ═══════════════════════════════════════════════════ */
+  function switchTab(tab) {
+    S.tab = tab
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'))
+    document.getElementById(`nav-${tab}`)?.classList.add('active')
+    renderCurrent()
+  }
+
+  function switchSubTab(tab, sub) {
+    S.subTab[tab] = sub
+    renderCurrent()
+  }
+
+  function renderCurrent() {
+    switch(S.tab) {
+      case 'hoy':    renderHoy();    break
+      case 'metas':  renderMetas();  break
+      case 'vida':   renderVida();   break
+      case 'cuerpo': renderCuerpo(); break
+      case 'nido':   renderNido();   break
+    }
+  }
+
+  function subTabsHtml(tab, options) {
+    return `<div class="sub-tabs">${options.map(o =>
+      `<div class="sub-tab ${S.subTab[tab]===o.id?'active':''}" onclick="switchSubTab('${tab}','${o.id}')">${o.label}</div>`
+    ).join('')}</div>`
+  }
+
+  /* ═══════════════════════════════════════════════════
+     USER MANAGEMENT
+  ═══════════════════════════════════════════════════ */
+  function selectUser(id) {
+    S.user = id
+    S.partner = id === 'alonso' ? 'lila' : 'alonso'
+    localStorage.setItem('nido_user', id)
+    const splash = document.getElementById('splash')
+    splash.style.transition = 'opacity .3s'
+    splash.style.opacity = '0'
+    setTimeout(() => {
+      splash.style.display = 'none'
+      boot()
+    }, 300)
+  }
+
+  function switchUser() {
+    localStorage.removeItem('nido_user')
+    location.reload()
+  }
+
+  /* ═══════════════════════════════════════════════════
+     BOOT
+  ═══════════════════════════════════════════════════ */
+  function showLoader(msg = 'Cargando Nido...') {
+    document.getElementById('loading-screen').classList.remove('hidden')
+    document.getElementById('loader-msg').textContent = msg
+    document.getElementById('loader-retry').style.display = 'none'
+  }
+
+  function hideLoader() {
+    document.getElementById('loading-screen').classList.add('hidden')
+  }
+
+  function showLoaderError(msg = 'Sin conexión') {
+    document.getElementById('loader-msg').textContent = msg
+    document.getElementById('loader-retry').style.display = 'block'
+    document.getElementById('loading-screen').querySelector('.loader-spinner').style.display = 'none'
+  }
+
+  async function boot() {
+    showLoader('Cargando Nido...')
+    try {
+      // Load saved Supabase config
+      const savedUrl = localStorage.getItem('nido_sb_url')
+      const savedKey = localStorage.getItem('nido_sb_key')
+      if (savedUrl && savedKey) {
+        CFG.SUPABASE_URL = savedUrl
+        CFG.SUPABASE_KEY = savedKey
+        initSB()
+      }
+      await DB.loadAll()
+      if (hasSB()) {
+        RT.sub()
+        // Auto-sync cada 30 segundos como respaldo al Realtime
+        setInterval(async () => {
+          await DB.loadAll()
+          renderCurrent()
+        }, 30000)
+      }
+      GCAL.loadToken()
+      if (S.gcalToken) GCAL.fetchEvents()
+      hideLoader()
+      document.getElementById('app').style.display = 'block'
+      renderHoy()
+    } catch(e) {
+      console.error('Boot error:', e)
+      showLoaderError('Error al cargar — revisa tu conexión')
+    }
+  }
+
+  async function init() {
+    const saved = localStorage.getItem('nido_user')
+    if (saved && CFG.USERS[saved]) {
+      S.user    = saved
+      S.partner = saved === 'alonso' ? 'lila' : 'alonso'
+      document.getElementById('splash').style.display = 'none'
+      await boot()
+    }
+  }
+
+  /* ═══════════════════════════════════════════════════
+     SYNC MANUAL
+  ═══════════════════════════════════════════════════ */
+  async function manualSync() {
+    if (!hasSB()) { toast('Sin conexión a Supabase'); return }
+    toast('🔄 Sincronizando...')
+    await DB.loadAll()
+    renderCurrent()
+    toast('✅ ¡Sincronizado!', 'ok')
+  }
+
+  /* ═══════════════════════════════════════════════════
+     HELPERS DE FECHA
+  ═══════════════════════════════════════════════════ */
+  function weekBounds() {
+    const now = new Date()
+    const day = now.getDay() // 0=dom, 1=lun...
+    const diff = (day === 0) ? -6 : 1 - day  // lunes como inicio
+    const mon  = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diff, 0, 0, 0)
+    const sun  = new Date(mon); sun.setDate(mon.getDate() + 6); sun.setHours(23, 59, 59)
+    return { mon, sun }
+  }
+
+  /* ═══════════════════════════════════════════════════
+     FAB INTELIGENTE
+  ═══════════════════════════════════════════════════ */
+  function openSmartLog() {
+    switch(S.tab) {
+      case 'hoy':    openLog('ahorro'); break
+      case 'metas':
+        if (S.subTab.metas === 'ahorro') openLog('ahorro')
+        else openAddGoal()
+        break
+      case 'vida':
+        if      (S.subTab.vida === 'agenda')    openAddPlan()
+        else if (S.subTab.vida === 'pendientes') openAddPending()
+        else if (S.subTab.vida === 'diario')    openAddMemory()
+        else if (S.subTab.vida === 'mapa')      openAddPin()
+        else openAddPlan()
+        break
+      case 'cuerpo':
+        if (S.subTab.cuerpo === 'reto') openFitnessLog()
+        else openLog('habito')
+        break
+      case 'nido':
+        if (S.subTab.nido === 'cariños') openSpark()
+        else if (S.subTab.nido === 'notas') openAddNote()
+        else openSpark()
+        break
+      default: openLog('ahorro')
+    }
+  }
+
+  /* ═══════════════════════════════════════════════════
+     METAS LIBRES — CREAR / EDITAR
+  ═══════════════════════════════════════════════════ */
+  let _goalType = 'numeric'
+
+  function openAddGoal() {
+    _goalType = 'numeric'
+    document.getElementById('sheet-body').innerHTML = `
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">🎯 Nueva meta</div>
+      <div class="form-group">
+        <label class="form-label">Tipo de meta</label>
+        <div class="goal-type-row">
+          <div class="goal-type-btn sel" id="gt-numeric" onclick="setGoalType('numeric')">📊 Número</div>
+          <div class="goal-type-btn"    id="gt-binary"  onclick="setGoalType('binary')">✅ Logro</div>
+          <div class="goal-type-btn"    id="gt-check"   onclick="setGoalType('checklist')">📋 Lista</div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Ícono (un emoji)</label>
+        <input type="text" class="form-input" id="ag-icon" placeholder="🏖️" maxlength="4" style="font-size:24px;text-align:center" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Nombre de la meta</label>
+        <input type="text" class="form-input" id="ag-name" placeholder="ej. Leer 12 libros este año" />
+      </div>
+      <div id="ag-extra">
+        <div class="form-group">
+          <label class="form-label">Objetivo (número)</label>
+          <input type="number" class="form-input" id="ag-target" placeholder="ej. 12" inputmode="decimal" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Unidad (opcional)</label>
+          <input type="text" class="form-input" id="ag-unit" placeholder="ej. libros, km, días..." />
+        </div>
+      </div>
+      <button class="btn-primary" onclick="submitAddGoal()">🎯 Crear meta</button>`
+    document.getElementById('sheet-wrap').classList.add('open')
+  }
+
+  function setGoalType(type) {
+    _goalType = type
+    document.querySelectorAll('.goal-type-btn').forEach(b => b.classList.remove('sel'))
+    document.getElementById(`gt-${type}`).classList.add('sel')
+    const extra = document.getElementById('ag-extra')
+    if (type === 'numeric') {
+      extra.innerHTML = `
+        <div class="form-group">
+          <label class="form-label">Objetivo (número)</label>
+          <input type="number" class="form-input" id="ag-target" placeholder="ej. 12" inputmode="decimal" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Unidad (opcional)</label>
+          <input type="text" class="form-input" id="ag-unit" placeholder="ej. libros, km, días..." />
+        </div>`
+    } else if (type === 'binary') {
+      extra.innerHTML = `<div class="form-group"><label class="form-label">Descripción breve (opcional)</label><input type="text" class="form-input" id="ag-desc" placeholder="ej. ¿Cuándo lo logramos?" /></div>`
+    } else {
+      extra.innerHTML = `
+        <div class="form-group">
+          <label class="form-label">Elementos de la lista (uno por línea)</label>
+          <textarea class="form-input" id="ag-items" rows="4" placeholder="Visitar París\nVer la Torre Eiffel\nComer croissants..." style="resize:none;line-height:1.6"></textarea>
+        </div>`
+    }
+  }
+
+  async function submitAddGoal() {
+    const icon = document.getElementById('ag-icon')?.value?.trim() || '🎯'
+    const name = document.getElementById('ag-name')?.value?.trim()
+    if (!name) { toast('Ponle un nombre a la meta'); return }
+    const goal = {
+      id:         crypto.randomUUID(),
+      icon, name,
+      type:       _goalType,
+      created_by: S.user,
+      done:       false,
+      created_at: new Date().toISOString()
+    }
+    if (_goalType === 'numeric') {
+      goal.target  = parseFloat(document.getElementById('ag-target')?.value) || 0
+      goal.current = 0
+      goal.unit    = document.getElementById('ag-unit')?.value?.trim() || ''
+    } else if (_goalType === 'binary') {
+      goal.goal_desc = document.getElementById('ag-desc')?.value?.trim() || ''
+    } else {
+      const raw = document.getElementById('ag-items')?.value || ''
+      goal.items = raw.split('\n').filter(s => s.trim()).map(s => ({ text: s.trim(), done: false }))
+    }
+    S.goals.unshift(goal)
+    DB._toLocal()
+    if (hasSB()) {
+      const row = { ...goal, items: goal.items ? JSON.stringify(goal.items) : null }
+      await sb.from('nido_goals').insert(row)
+    }
+    closeSheet()
+    toast(`🎯 Meta "${name}" creada`, 'ok')
+    renderCurrent()
+  }
+
+  function openGoalProgress(goalId) {
+    const g = S.goals.find(x => x.id === goalId)
+    if (!g) return
+    let body = ''
+    if (g.type === 'numeric') {
+      body = `
+        <div class="form-group">
+          <label class="form-label">Progreso actual</label>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input type="number" class="form-input" id="gp-val" value="${g.current||0}" inputmode="decimal" style="flex:1"/>
+            <span style="font-size:14px;color:var(--text-muted);font-weight:600">/ ${g.target} ${g.unit||''}</span>
+          </div>
+        </div>
+        <button class="btn-primary" onclick="submitGoalProgress('${goalId}')">Actualizar progreso</button>`
+    } else if (g.type === 'binary') {
+      body = `
+        <div style="text-align:center;padding:24px 0">
+          <div style="font-size:48px;margin-bottom:12px">${g.icon}</div>
+          <div style="font-size:18px;font-weight:700;margin-bottom:20px">${g.name}</div>
+          <button class="btn-primary" onclick="toggleGoalDone('${goalId}')">
+            ${g.done ? '↩ Deshacer logro' : '🏆 ¡Marcar como logrado!'}
+          </button>
+        </div>`
+    } else {
+      const items = g.items || []
+      body = `
+        <div style="margin-bottom:14px">
+          ${items.map((it,i) => `
+            <label style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer">
+              <input type="checkbox" ${it.done?'checked':''} onchange="toggleCheckItem('${goalId}',${i},this.checked)" style="width:18px;height:18px;accent-color:var(--rose);flex-shrink:0"/>
+              <span style="font-size:14px;${it.done?'text-decoration:line-through;color:var(--text-muted)':''}">${it.text}</span>
+            </label>`).join('')}
+        </div>`
+    }
+
+    document.getElementById('sheet-body').innerHTML = `
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">${g.icon} ${g.name}</div>
+      ${body}`
+    document.getElementById('sheet-wrap').classList.add('open')
+  }
+
+  async function submitGoalProgress(goalId) {
+    const g = S.goals.find(x => x.id === goalId)
+    if (!g) return
+    const val = parseFloat(document.getElementById('gp-val')?.value) || 0
+    g.current = val
+    if (g.target && val >= g.target) g.done = true
+    DB._toLocal()
+    if (hasSB()) await sb.from('nido_goals').update({ current: val, done: g.done }).eq('id', goalId)
+    closeSheet()
+    toast(`📊 Progreso actualizado: ${val} ${g.unit||''}`, 'ok')
+    renderCurrent()
+  }
+
+  async function toggleGoalDone(goalId) {
+    const g = S.goals.find(x => x.id === goalId)
+    if (!g) return
+    g.done = !g.done
+    DB._toLocal()
+    if (hasSB()) await sb.from('nido_goals').update({ done: g.done }).eq('id', goalId)
+    closeSheet()
+    toast(g.done ? '🏆 ¡Meta lograda! ¡Bien!' : '↩ Meta reabierta', g.done ? 'ok' : '')
+    renderCurrent()
+  }
+
+  async function toggleCheckItem(goalId, idx, checked) {
+    const g = S.goals.find(x => x.id === goalId)
+    if (!g || !g.items) return
+    g.items[idx].done = checked
+    g.done = g.items.every(it => it.done)
+    DB._toLocal()
+    if (hasSB()) await sb.from('nido_goals').update({ items: JSON.stringify(g.items), done: g.done }).eq('id', goalId)
+    // no re-render to keep the sheet open
+  }
+
+  /* ═══════════════════════════════════════════════════
+     RETO FÍSICO — REGISTRAR SEMANA
+  ═══════════════════════════════════════════════════ */
+  function openFitnessLog() {
+    const ws = weekStart()
+    const existing = S.fitness.find(f => f.user_id === S.user && f.week_start === ws)
+    document.getElementById('sheet-body').innerHTML = `
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">💪 Registro semanal</div>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px">Semana del ${ws}</p>
+      <div class="form-group">
+        <label class="form-label">⚖️ Peso actual (kg)</label>
+        <input type="number" class="form-input" id="fi-weight" value="${existing?.weight||''}" placeholder="ej. 70.5" inputmode="decimal" step="0.1"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">📏 Cintura (cm)</label>
+        <input type="number" class="form-input" id="fi-waist"  value="${existing?.waist||''}"  placeholder="ej. 82" inputmode="decimal" step="0.5"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">💪 Brazo (cm)</label>
+        <input type="number" class="form-input" id="fi-arm"    value="${existing?.arm||''}"    placeholder="ej. 34" inputmode="decimal" step="0.5"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">🏋️ Días de gym esta semana</label>
+        <select class="form-select" id="fi-gym">
+          ${[0,1,2,3,4,5,6,7].map(n => `<option value="${n}" ${(existing?.gym_days||0)==n?'selected':''}>${n} día${n!==1?'s':''}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">🏃 Cardio total (minutos esta semana)</label>
+        <input type="number" class="form-input" id="fi-cardio" value="${existing?.cardio_min||''}" placeholder="ej. 120" inputmode="numeric"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">💧 Agua promedio (vasos al día)</label>
+        <input type="number" class="form-input" id="fi-water"  value="${existing?.water_avg||''}"  placeholder="ej. 8" inputmode="decimal" step="0.5"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">😴 Sueño promedio (horas por noche)</label>
+        <input type="number" class="form-input" id="fi-sleep"  value="${existing?.sleep_avg||''}"  placeholder="ej. 7.5" inputmode="decimal" step="0.5"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">⚡ Nivel de energía general (1-5)</label>
+        <select class="form-select" id="fi-energy">
+          ${[1,2,3,4,5].map(n => `<option value="${n}" ${(existing?.energy||3)==n?'selected':''}>${n} – ${{1:'Agotado',2:'Bajo',3:'Normal',4:'Bien',5:'Excelente'}[n]}</option>`).join('')}
+        </select>
+      </div>
+      <button class="btn-primary" onclick="submitFitnessLog()">💪 Guardar semana</button>`
+    document.getElementById('sheet-wrap').classList.add('open')
+  }
+
+  async function submitFitnessLog() {
+    const ws = weekStart()
+    const rec = {
+      user_id:    S.user,
+      week_start: ws,
+      weight:     parseFloat(document.getElementById('fi-weight')?.value) || null,
+      waist:      parseFloat(document.getElementById('fi-waist')?.value)  || null,
+      arm:        parseFloat(document.getElementById('fi-arm')?.value)    || null,
+      gym_days:   parseInt(document.getElementById('fi-gym')?.value)      || 0,
+      cardio_min: parseInt(document.getElementById('fi-cardio')?.value)   || 0,
+      water_avg:  parseFloat(document.getElementById('fi-water')?.value)  || null,
+      sleep_avg:  parseFloat(document.getElementById('fi-sleep')?.value)  || null,
+      energy:     parseInt(document.getElementById('fi-energy')?.value)   || 3,
+      created_at: new Date().toISOString()
+    }
+    // Reemplazar o agregar
+    const idx = S.fitness.findIndex(f => f.user_id === S.user && f.week_start === ws)
+    if (idx >= 0) S.fitness[idx] = rec
+    else S.fitness.unshift(rec)
+    DB._toLocal()
+    if (hasSB()) {
+      await sb.from('nido_fitness').upsert(rec, { onConflict: 'user_id,week_start' })
+    }
+    closeSheet()
+    toast('💪 ¡Semana registrada!', 'ok')
+    renderCurrent()
+  }
+
+  /* ═══════════════════════════════════════════════════
+     DIARIO DEL NIDO — AGREGAR MEMORIA
+  ═══════════════════════════════════════════════════ */
+  function openAddMemory() {
+    const today = new Date().toISOString().split('T')[0]
+    document.getElementById('sheet-body').innerHTML = `
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">📸 Nuevo recuerdo</div>
+      <div class="form-group">
+        <label class="form-label">Título del recuerdo</label>
+        <input type="text" class="form-input" id="mem-title" placeholder="ej. Nuestra primera cita en el parque" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">¿Cuándo fue?</label>
+        <input type="date" class="form-input" id="mem-date" value="${today}" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Cuéntalo (opcional)</label>
+        <textarea class="form-input" id="mem-text" rows="3" placeholder="Fue un día increíble porque..." style="resize:none;line-height:1.6"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">📎 Foto (opcional — URL de imagen)</label>
+        <input type="url" class="form-input" id="mem-photo" placeholder="https://..." />
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Sube la foto a Google Fotos y copia el enlace directo</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Ícono del recuerdo</label>
+        <input type="text" class="form-input" id="mem-icon" placeholder="🌅" maxlength="4" style="font-size:24px;text-align:center" />
+      </div>
+      <button class="btn-primary" onclick="submitAddMemory()">📸 Guardar recuerdo</button>`
+    document.getElementById('sheet-wrap').classList.add('open')
+  }
+
+  async function submitAddMemory() {
+    const title = document.getElementById('mem-title')?.value?.trim()
+    if (!title) { toast('Ponle un título al recuerdo'); return }
+    const mem = {
+      id:          crypto.randomUUID(),
+      user_id:     S.user,
+      title,
+      happened_on: document.getElementById('mem-date')?.value || new Date().toISOString().split('T')[0],
+      text:        document.getElementById('mem-text')?.value?.trim() || '',
+      photo_url:   document.getElementById('mem-photo')?.value?.trim() || '',
+      icon:        document.getElementById('mem-icon')?.value?.trim() || '📸',
+      created_at:  new Date().toISOString()
+    }
+    S.memories.unshift(mem)
+    DB._toLocal()
+    if (hasSB()) await sb.from('nido_memories').insert(mem)
+    closeSheet()
+    toast('📸 ¡Recuerdo guardado!', 'ok')
+    renderCurrent()
+  }
+
+  /* ═══════════════════════════════════════════════════
+     PENDIENTES JUNTOS
+  ═══════════════════════════════════════════════════ */
+  function openAddPending() {
+    document.getElementById('sheet-body').innerHTML = `
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">🎬 Nuevo pendiente</div>
+      <div class="form-group">
+        <label class="form-label">Tipo</label>
+        <select class="form-select" id="pend-type">
+          <option value="🎬">🎬 Película / Serie</option>
+          <option value="🍽️">🍽️ Restaurante</option>
+          <option value="📍">📍 Lugar / Viaje</option>
+          <option value="🎭">🎭 Actividad / Plan</option>
+          <option value="📚">📚 Libro</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Nombre</label>
+        <input type="text" class="form-input" id="pend-name" placeholder="ej. Dune: Part Two" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Nota (opcional)</label>
+        <input type="text" class="form-input" id="pend-note" placeholder="ej. En el cine cuando salga" />
+      </div>
+      <button class="btn-primary" onclick="submitAddPending()">Agregar a la lista</button>`
+    document.getElementById('sheet-wrap').classList.add('open')
+  }
+
+  async function submitAddPending() {
+    const name = document.getElementById('pend-name')?.value?.trim()
+    if (!name) { toast('Escribe el nombre'); return }
+    const item = {
+      id:         crypto.randomUUID(),
+      created_by: S.user,
+      type_icon:  document.getElementById('pend-type')?.value || '🎬',
+      name,
+      note:       document.getElementById('pend-note')?.value?.trim() || '',
+      status:     'want',
+      created_at: new Date().toISOString()
+    }
+    S.pending.unshift(item)
+    DB._toLocal()
+    if (hasSB()) await sb.from('nido_pending').insert(item)
+    closeSheet()
+    toast(`✨ "${name}" agregado a la lista`, 'ok')
+    renderCurrent()
+  }
+
+  async function cyclePendingStatus(id) {
+    const item = S.pending.find(p => p.id === id)
+    if (!item) return
+    const cycle = { want: 'booked', booked: 'done', done: 'want' }
+    const labels = { want: '📋 Quiero', booked: '🗓️ Agendado', done: '✅ Hecho' }
+    item.status = cycle[item.status] || 'want'
+    DB._toLocal()
+    if (hasSB()) await sb.from('nido_pending').update({ status: item.status }).eq('id', id)
+    toast(`${labels[item.status]}`, 'ok')
+    renderCurrent()
+  }
+
+  /* ═══════════════════════════════════════════════════
+     MAPA — AGREGAR PIN
+  ═══════════════════════════════════════════════════ */
+  function openAddPin() {
+    document.getElementById('sheet-body').innerHTML = `
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">🗺️ Nuevo lugar</div>
+      <div class="form-group">
+        <label class="form-label">Nombre del lugar</label>
+        <input type="text" class="form-input" id="pin-name" placeholder="ej. Donde nos besamos por primera vez" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Ícono</label>
+        <input type="text" class="form-input" id="pin-icon" placeholder="📍" maxlength="4" style="font-size:24px;text-align:center" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Nota (opcional)</label>
+        <input type="text" class="form-input" id="pin-note" placeholder="ej. Nuestro lugar favorito" />
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:14px">
+        <div class="form-group" style="flex:1;margin:0">
+          <label class="form-label">Latitud</label>
+          <input type="number" class="form-input" id="pin-lat" placeholder="19.4326" inputmode="decimal" step="any"/>
+        </div>
+        <div class="form-group" style="flex:1;margin:0">
+          <label class="form-label">Longitud</label>
+          <input type="number" class="form-input" id="pin-lng" placeholder="-99.1332" inputmode="decimal" step="any"/>
+        </div>
+      </div>
+      <button class="btn-ghost" style="width:100%;margin-bottom:10px" onclick="useGPS()">📡 Usar mi ubicación actual</button>
+      <button class="btn-primary" onclick="submitAddPin()">📍 Guardar lugar</button>`
+    document.getElementById('sheet-wrap').classList.add('open')
+  }
+
+  function useGPS() {
+    if (!navigator.geolocation) { toast('Tu dispositivo no tiene GPS'); return }
+    toast('📡 Obteniendo ubicación...')
+    navigator.geolocation.getCurrentPosition(pos => {
+      document.getElementById('pin-lat').value = pos.coords.latitude.toFixed(5)
+      document.getElementById('pin-lng').value = pos.coords.longitude.toFixed(5)
+      toast('📡 Ubicación obtenida', 'ok')
+    }, () => { toast('No se pudo obtener la ubicación') })
+  }
+
+  async function submitAddPin() {
+    const name = document.getElementById('pin-name')?.value?.trim()
+    const lat  = parseFloat(document.getElementById('pin-lat')?.value)
+    const lng  = parseFloat(document.getElementById('pin-lng')?.value)
+    if (!name)             { toast('Ponle un nombre al lugar'); return }
+    if (isNaN(lat) || isNaN(lng)) { toast('Agrega las coordenadas o usa GPS'); return }
+    const pin = {
+      id:         crypto.randomUUID(),
+      created_by: S.user,
+      name,
+      icon:       document.getElementById('pin-icon')?.value?.trim() || '📍',
+      note:       document.getElementById('pin-note')?.value?.trim() || '',
+      lat, lng,
+      created_at: new Date().toISOString()
+    }
+    S.mapPins.unshift(pin)
+    DB._toLocal()
+    if (hasSB()) await sb.from('nido_map_pins').insert(pin)
+    // Agregar al mapa si ya está inicializado
+    if (S.leafletMap) {
+      const icon = pin.icon || '📍'
+      L.marker([lat, lng])
+        .addTo(S.leafletMap)
+        .bindPopup(`<b>${icon} ${name}</b>${pin.note ? '<br>'+pin.note : ''}`)
+    }
+    closeSheet()
+    toast(`📍 "${name}" guardado en el mapa`, 'ok')
+    renderCurrent()
+  }
+
+  /* ═══════════════════════════════════════════════════
+     NOTAS SECRETAS
+  ═══════════════════════════════════════════════════ */
+  function openAddNote() {
+    const them = CFG.USERS[S.partner]
+    document.getElementById('sheet-body').innerHTML = `
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">💌 Nota para ${them.emoji} ${them.name}</div>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px;line-height:1.6">
+        Solo ${them.name} podrá leer esta nota. Es tu espacio para decirle algo especial 💕
+      </p>
+      <div class="form-group">
+        <label class="form-label">Tu mensaje secreto</label>
+        <textarea class="form-input" id="note-msg" rows="5" placeholder="Escribe algo bonito, algo que quieras que sepa..." style="resize:none;line-height:1.6"></textarea>
+      </div>
+      <button class="btn-primary" onclick="submitAddNote()">💌 Enviar nota secreta</button>`
+    document.getElementById('sheet-wrap').classList.add('open')
+  }
+
+  async function submitAddNote() {
+    const msg = document.getElementById('note-msg')?.value?.trim()
+    if (!msg) { toast('Escribe algo primero'); return }
+    const note = {
+      id:         crypto.randomUUID(),
+      from_user:  S.user,
+      to_user:    S.partner,
+      message:    msg,
+      created_at: new Date().toISOString()
+    }
+    S.notes.unshift(note)
+    DB._toLocal()
+    if (hasSB()) await sb.from('nido_notes').insert(note)
+    closeSheet()
+    toast(`💌 ¡Nota enviada a ${CFG.USERS[S.partner].name}!`, 'hot')
+    renderCurrent()
+  }
+
+  /* ═══════════════════════════════════════════════════
+     HÁBITOS — META SEMANAL
+  ═══════════════════════════════════════════════════ */
+  function openSetHabitGoal(habitId) {
+    const h = CFG.HABITS.find(x => x.id === habitId)
+    if (!h) return
+    const ws = weekStart()
+    const existing = S.habitGoals.find(g => g.habit_id === habitId && g.user_id === S.user && g.week_start === ws)
+    document.getElementById('sheet-body').innerHTML = `
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">${h.icon} Meta de ${h.name}</div>
+      <div class="form-group">
+        <label class="form-label">¿Cuántos días quieres lograr este hábito esta semana?</label>
+        <select class="form-select" id="hg-days">
+          ${[1,2,3,4,5,6,7].map(n => `<option value="${n}" ${(existing?.target_days||3)==n?'selected':''}>${n} día${n!==1?'s':''} de 7</option>`).join('')}
+        </select>
+      </div>
+      <button class="btn-primary" onclick="submitHabitGoal('${habitId}')">Guardar meta</button>`
+    document.getElementById('sheet-wrap').classList.add('open')
+  }
+
+  async function submitHabitGoal(habitId) {
+    const ws = weekStart()
+    const days = parseInt(document.getElementById('hg-days')?.value) || 3
+    const goal = {
+      id:          crypto.randomUUID(),
+      user_id:     S.user,
+      habit_id:    habitId,
+      week_start:  ws,
+      target_days: days,
+      created_at:  new Date().toISOString()
+    }
+    const idx = S.habitGoals.findIndex(g => g.habit_id === habitId && g.user_id === S.user && g.week_start === ws)
+    if (idx >= 0) { goal.id = S.habitGoals[idx].id; S.habitGoals[idx] = goal }
+    else S.habitGoals.unshift(goal)
+    DB._toLocal()
+    if (hasSB()) await sb.from('nido_habit_goals').upsert(goal, { onConflict: 'user_id,habit_id,week_start' })
+    closeSheet()
+    toast(`🎯 Meta de ${days} días guardada`, 'ok')
+    renderCurrent()
+  }
+
+  /* ═══════════════════════════════════════════════════
+     AGENDA — FILTRO POR DÍA
+  ═══════════════════════════════════════════════════ */
+  let _agendaFilter = null
+
+  function filterAgendaDay(dateStr) {
+    _agendaFilter = (_agendaFilter === dateStr) ? null : dateStr
+    renderVida()
+  }
+
+  init()
+  </script>
+</body>
+</html>
