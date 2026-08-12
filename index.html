@@ -1311,19 +1311,39 @@
 
     isConnected() { return !!S.gcalToken },
 
-    connect() {
-      if (!window.google?.accounts?.oauth2) { toast('Google aún cargando, intenta en 2 seg'); return }
+    connect(silent = false) {
+      if (!window.google?.accounts?.oauth2) {
+        if (!silent) toast('Google aún cargando, intenta en 2 seg')
+        return
+      }
       const client = window.google.accounts.oauth2.initTokenClient({
         client_id: CFG.GCAL_CLIENT_ID,
         scope: CFG.GCAL_SCOPE,
+        prompt: silent ? '' : 'select_account',
         callback: (resp) => {
-          if (resp.error) { toast('Error al conectar Google Calendar'); return }
+          if (resp.error) {
+            if (!silent) toast('Error al conectar Google Calendar')
+            return
+          }
           this.saveToken(resp)
-          toast('📅 Google Calendar conectado ✓', 'ok')
+          if (!silent) toast('📅 Google Calendar conectado ✓', 'ok')
           this.fetchEvents().then(() => renderCurrent())
         }
       })
       client.requestAccessToken()
+    },
+
+    // Renueva el token silenciosamente si está por expirar
+    silentRefresh() {
+      const raw = localStorage.getItem(this._key)
+      if (!raw) return  // nunca conectó, no hacer nada
+      try {
+        const { exp } = JSON.parse(raw)
+        // Si expira en menos de 10 min, renovar en silencio
+        if (exp - Date.now() < 10 * 60 * 1000) {
+          this.connect(true)
+        }
+      } catch(e) {}
     },
 
     disconnect() {
@@ -2752,6 +2772,8 @@
       }
       GCAL.loadToken()
       if (S.gcalToken) GCAL.fetchEvents()
+      // Revisar cada 5 minutos si el token de Google está por expirar y renovarlo
+      setInterval(() => GCAL.silentRefresh(), 5 * 60 * 1000)
       hideLoader()
       document.getElementById('app').style.display = 'block'
       renderHoy()
