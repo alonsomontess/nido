@@ -9,9 +9,7 @@
   <meta name="theme-color" content="#C2185B" />
   <title>Nido 🪺</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://accounts.google.com/gsi/client" async></script>
 
   <style>
@@ -497,15 +495,15 @@
     .nav-btn {
       flex: 1;
       display: flex; flex-direction: column; align-items: center;
-      gap: 3px; padding: 8px 0 0;
+      gap: 2px; padding: 8px 0 0;
       background: none; border: none;
       cursor: pointer;
       color: var(--text-muted);
-      font-size: 10px; font-weight: 600;
-      letter-spacing: .05em; text-transform: uppercase;
+      font-size: 9px; font-weight: 600;
+      letter-spacing: .03em; text-transform: uppercase;
       transition: color .15s;
     }
-    .nav-btn .ni { font-size: 22px; line-height: 1; }
+    .nav-btn .ni { font-size: 20px; line-height: 1; }
     .nav-btn.active { color: var(--rose); }
     /* FAB flotante (esquina inferior derecha) */
     .log-fab {
@@ -857,11 +855,10 @@
     .habit-day.today { border-color: var(--rose-mid); font-weight: 800; }
 
     /* ══════════════════════════════════════
-       MAPA (placeholder hasta tener Leaflet)
+       JUGAR — Temas y Retos
     ══════════════════════════════════════ */
     #map-container {
-      width: 100%; height: 320px;
-      border-radius: var(--r);
+      display: none;
       overflow: hidden;
       box-shadow: var(--shadow);
     }
@@ -917,6 +914,9 @@
       <button class="nav-btn" id="nav-nido"   onclick="switchTab('nido')">
         <span class="ni">🪺</span><span>NIDO</span>
       </button>
+      <button class="nav-btn" id="nav-jugar"  onclick="switchTab('jugar')">
+        <span class="ni">🎲</span><span>JUGAR</span>
+      </button>
     </nav>
   </div>
 
@@ -958,9 +958,13 @@
 
     SCORE: { PER_100: 1, PER_HABIT: 5, PER_SPARK: 2 },
 
-    // Google Calendar — agrega tu Netlify URL en Google Cloud Console → Authorized JavaScript Origins
+    // Google Calendar
     GCAL_CLIENT_ID: '572897240301-uq0hhpse3ioddl9g5cpqd4cfvgf8rlm1.apps.googleusercontent.com',
-    GCAL_SCOPE: 'https://www.googleapis.com/auth/calendar'
+    GCAL_SCOPE: 'https://www.googleapis.com/auth/calendar',
+
+    // Claude API — pon tu Anthropic API key para habilitar temas y retos con IA
+    // Consíguela en: console.anthropic.com → API Keys
+    CLAUDE_API_KEY: 'YOUR_ANTHROPIC_API_KEY'
   }
 
   /* ═══════════════════════════════════════════════════
@@ -969,7 +973,7 @@
   const S = {
     user: null, partner: null,
     tab: 'hoy',
-    subTab: { metas:'ahorro', vida:'agenda', cuerpo:'reto', nido:'cariños' },
+    subTab: { metas:'ahorro', vida:'agenda', cuerpo:'reto', nido:'cariños', jugar:'temas' },
     // datos
     savings: [], habits: [], sparks: [], plans: [],
     goals: [],        // metas libres
@@ -977,12 +981,12 @@
     memories: [],     // diario del nido
     pending: [],      // pendientes juntos
     notes: [],        // notas secretas
-    mapPins: [],      // pins del mapa
     habitGoals: [],   // metas de hábitos semanales
+    retos: [],        // retos semanales de pareja
     // google calendar
     gcalToken: null, gcalEvents: [],
-    // mapa
-    leafletMap: null
+    // jugar — estado temporal
+    jugarTopics: [], jugarLoading: false
   }
 
   /* ═══════════════════════════════════════════════════
@@ -1007,7 +1011,7 @@
       this._fromLocal()
       if (!hasSB()) return
       try {
-        const [sv, hb, sp, pl, go, fi, me, pe, no, mp, hg] = await Promise.all([
+        const [sv, hb, sp, pl, go, fi, me, pe, no, hg, re] = await Promise.all([
           sb.from('nido_savings'    ).select('*').order('created_at', { ascending: false }),
           sb.from('nido_habits'     ).select('*').order('created_at', { ascending: false }),
           sb.from('nido_sparks'     ).select('*').order('created_at', { ascending: false }).limit(50),
@@ -1017,8 +1021,8 @@
           sb.from('nido_memories'   ).select('*').order('happened_on',{ ascending: false }),
           sb.from('nido_pending'    ).select('*').order('created_at', { ascending: false }),
           sb.from('nido_notes'      ).select('*').order('created_at', { ascending: false }),
-          sb.from('nido_map_pins'   ).select('*').order('created_at', { ascending: false }),
-          sb.from('nido_habit_goals').select('*').order('created_at', { ascending: false })
+          sb.from('nido_habit_goals').select('*').order('created_at', { ascending: false }),
+          sb.from('nido_retos'      ).select('*').order('created_at', { ascending: false })
         ])
         if (sv.data?.length) S.savings    = sv.data
         if (hb.data?.length) S.habits     = hb.data
@@ -1029,8 +1033,8 @@
         if (me.data?.length) S.memories   = me.data
         if (pe.data?.length) S.pending    = pe.data
         if (no.data?.length) S.notes      = no.data
-        if (mp.data?.length) S.mapPins    = mp.data
         if (hg.data?.length) S.habitGoals = hg.data
+        if (re.data?.length) S.retos      = re.data
         this._toLocal()
       } catch(e) { console.error('Supabase load error:', e) }
     },
@@ -1159,12 +1163,11 @@
       }
     },
 
-    async saveMapPin({ lat, lng, title, note, emoji }) {
-      const row = { created_by: S.user, lat, lng, title, note: note||'', emoji: emoji||'📍', created_at: new Date().toISOString() }
-      S.mapPins.unshift(row); this._toLocal()
+    async saveReto(reto) {
+      S.retos.unshift(reto); this._toLocal()
       if (hasSB()) {
-        const { data } = await sb.from('nido_map_pins').insert(row).select()
-        if (data?.[0]) { S.mapPins[0] = data[0]; this._toLocal() }
+        const { data } = await sb.from('nido_retos').insert(reto).select()
+        if (data?.[0]) { S.retos[0] = data[0]; this._toLocal() }
       }
     },
 
@@ -1185,12 +1188,12 @@
     },
 
     _toLocal() {
-      const keys = ['savings','habits','sparks','plans','goals','fitness','memories','pending','notes','mapPins','habitGoals']
-      keys.forEach(k => localStorage.setItem(`nido_${k === 'mapPins' ? 'map_pins' : k}`, JSON.stringify(S[k])))
+      const keys = ['savings','habits','sparks','plans','goals','fitness','memories','pending','notes','habitGoals','retos']
+      keys.forEach(k => localStorage.setItem(`nido_${k}`, JSON.stringify(S[k])))
     },
 
     _fromLocal() {
-      const load = (key, storeKey) => JSON.parse(localStorage.getItem(`nido_${key}`) || '[]')
+      const load = (key) => JSON.parse(localStorage.getItem(`nido_${key}`) || '[]')
       S.savings    = load('savings')
       S.habits     = load('habits')
       S.sparks     = load('sparks')
@@ -1200,8 +1203,8 @@
       S.memories   = load('memories')
       S.pending    = load('pending')
       S.notes      = load('notes')
-      S.mapPins    = load('map_pins')
       S.habitGoals = load('habitGoals')
+      S.retos      = load('retos')
     }
   }
 
@@ -1281,7 +1284,7 @@
           if (r.to_user === S.user) toast(`💌 ¡Tienes una nota secreta de ${CFG.USERS[S.partner].name}!`, 'hot')
           renderCurrent()
         }).subscribe(),
-        sb.channel('nido-map-pins').on('postgres_changes', { event:'INSERT', schema:'public', table:'nido_map_pins'   }, onGeneric('nido_map_pins', 'id', 'mapPins'  )).subscribe(),
+        sb.channel('nido-retos').on('postgres_changes', { event:'INSERT', schema:'public', table:'nido_retos' }, onGeneric('nido_retos', 'id', 'retos')).subscribe(),
       ]
     }
   }
@@ -1967,15 +1970,14 @@
   }
 
   /* ═══════════════════════════════════════════════════
-     RENDER — VIDA (agenda · pendientes · diario · mapa)
+     RENDER — VIDA (agenda · pendientes · diario)
   ═══════════════════════════════════════════════════ */
   function renderVida() {
     const sub  = S.subTab.vida
     const tabs = subTabsHtml('vida', [
       { id:'agenda',    label:'🗓 Agenda'    },
       { id:'pendientes',label:'🎬 Pendientes'},
-      { id:'diario',    label:'📸 Diario'   },
-      { id:'mapa',      label:'🗺 Mapa'     }
+      { id:'diario',    label:'📖 Diario'   }
     ])
 
     if (sub === 'agenda') {
@@ -2093,45 +2095,6 @@
       return
     }
 
-    // ── Mapa de aventuras ──
-    document.getElementById('tab-content').innerHTML = `
-      <div class="page">
-        <div class="page-header"><div class="page-title">Mapa 🗺</div><button class="btn-ghost" onclick="openAddPin()">+ Pin</button></div>
-        ${tabs}
-        <div id="map-container"></div>
-        <div style="margin-top:14px">
-          ${S.mapPins.length === 0
-            ? `<div class="empty"><p>No hay pins todavía. ¡Marquen sus lugares!</p></div>`
-            : S.mapPins.map(p => `
-                <div class="card" style="margin-bottom:8px;display:flex;align-items:center;gap:12px">
-                  <div style="font-size:24px">${p.emoji||'📍'}</div>
-                  <div><div style="font-size:14px;font-weight:700">${p.title}</div>${p.note?`<div style="font-size:12px;color:var(--text-muted)">${p.note}</div>`:''}</div>
-                </div>`).join('')}
-        </div>
-      </div>`
-    initMap()
-  }
-
-  let _MAP = null
-  function initMap() {
-    setTimeout(() => {
-      const el = document.getElementById('map-container')
-      if (!el) return
-      const center = S.mapPins.length > 0
-        ? [S.mapPins[0].lat, S.mapPins[0].lng]
-        : [19.4326, -99.1332] // CDMX por defecto
-      if (!_MAP) {
-        _MAP = L.map('map-container').setView(center, 12)
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'© OSM', maxZoom:19 }).addTo(_MAP)
-      } else {
-        _MAP.eachLayer(l => { if (l instanceof L.Marker) _MAP.removeLayer(l) })
-      }
-      S.mapPins.forEach(p => {
-        const icon = L.divIcon({ className:'', html:`<div style="font-size:24px">${p.emoji||'📍'}</div>`, iconSize:[30,30], iconAnchor:[15,15] })
-        L.marker([p.lat, p.lng], { icon }).addTo(_MAP).bindPopup(`<b>${p.title}</b><br>${p.note||''}`)
-      })
-      _MAP.invalidateSize()
-    }, 120)
   }
 
   /* ═══════════════════════════════════════════════════
@@ -2476,7 +2439,7 @@
       { icon:'📖', name:'Cronistas del amor', desc:'10+ recuerdos en el diario', unlocked: totalMemories >= 10 },
       { icon:'🏋️', name:'Primer gym',    desc:'Registrar la primera semana física', unlocked: S.fitness.length > 0 },
       { icon:'💪', name:'Constantes',    desc:'4 semanas registradas en CUERPO', unlocked: weeksLogged >= 4 },
-      { icon:'🗺️', name:'Primer pin',   desc:'Marcar su primer lugar en el mapa', unlocked: S.mapPins.length > 0 },
+      { icon:'🎯', name:'Primer reto',   desc:'Completar su primer reto semanal', unlocked: S.retos.some(r => r.completed && r.user_id === S.user) },
       { icon:'🎬', name:'Lista de sueños', desc:'Agregar 5+ pendientes juntos', unlocked: S.pending.length >= 5 },
       { icon:'🏆', name:'Completamos algo', desc:'Marcar un pendiente como "Fuimos/Vimos"', unlocked: S.pending.some(p=>p.status==='done') },
       { icon:'🪺', name:'Nido completo', desc:'Usar todas las secciones de la app', unlocked: S.savings.length>0&&S.habits.length>0&&S.plans.length>0&&S.fitness.length>0&&S.memories.length>0 }
@@ -2701,6 +2664,7 @@
       case 'vida':   renderVida();   break
       case 'cuerpo': renderCuerpo(); break
       case 'nido':   renderNido();   break
+      case 'jugar':  renderJugar();  break
     }
   }
 
@@ -2830,7 +2794,6 @@
         if      (S.subTab.vida === 'agenda')    openAddPlan()
         else if (S.subTab.vida === 'pendientes') openAddPending()
         else if (S.subTab.vida === 'diario')    openAddMemory()
-        else if (S.subTab.vida === 'mapa')      openAddPin()
         else openAddPlan()
         break
       case 'cuerpo':
@@ -2841,6 +2804,9 @@
         if (S.subTab.nido === 'cariños') openSpark()
         else if (S.subTab.nido === 'notas') openAddNote()
         else openSpark()
+        break
+      case 'jugar':
+        if (S.subTab.jugar === 'retos') openPickReto()
         break
       default: openLog('ahorro')
     }
@@ -3217,75 +3183,34 @@
   /* ═══════════════════════════════════════════════════
      MAPA — AGREGAR PIN
   ═══════════════════════════════════════════════════ */
-  function openAddPin() {
-    document.getElementById('sheet-body').innerHTML = `
-      <div class="sheet-handle"></div>
-      <div class="sheet-title">🗺️ Nuevo lugar</div>
-      <div class="form-group">
-        <label class="form-label">Nombre del lugar</label>
-        <input type="text" class="form-input" id="pin-name" placeholder="ej. Donde nos besamos por primera vez" />
-      </div>
-      <div class="form-group">
-        <label class="form-label">Ícono</label>
-        <input type="text" class="form-input" id="pin-icon" placeholder="📍" maxlength="4" style="font-size:24px;text-align:center" />
-      </div>
-      <div class="form-group">
-        <label class="form-label">Nota (opcional)</label>
-        <input type="text" class="form-input" id="pin-note" placeholder="ej. Nuestro lugar favorito" />
-      </div>
-      <div style="display:flex;gap:8px;margin-bottom:14px">
-        <div class="form-group" style="flex:1;margin:0">
-          <label class="form-label">Latitud</label>
-          <input type="number" class="form-input" id="pin-lat" placeholder="19.4326" inputmode="decimal" step="any"/>
-        </div>
-        <div class="form-group" style="flex:1;margin:0">
-          <label class="form-label">Longitud</label>
-          <input type="number" class="form-input" id="pin-lng" placeholder="-99.1332" inputmode="decimal" step="any"/>
-        </div>
-      </div>
-      <button class="btn-ghost" style="width:100%;margin-bottom:10px" onclick="useGPS()">📡 Usar mi ubicación actual</button>
-      <button class="btn-primary" onclick="submitAddPin()">📍 Guardar lugar</button>`
-    document.getElementById('sheet-wrap').classList.add('open')
-  }
-
-  function useGPS() {
-    if (!navigator.geolocation) { toast('Tu dispositivo no tiene GPS'); return }
-    toast('📡 Obteniendo ubicación...')
-    navigator.geolocation.getCurrentPosition(pos => {
-      document.getElementById('pin-lat').value = pos.coords.latitude.toFixed(5)
-      document.getElementById('pin-lng').value = pos.coords.longitude.toFixed(5)
-      toast('📡 Ubicación obtenida', 'ok')
-    }, () => { toast('No se pudo obtener la ubicación') })
-  }
-
-  async function submitAddPin() {
-    const name = document.getElementById('pin-name')?.value?.trim()
-    const lat  = parseFloat(document.getElementById('pin-lat')?.value)
-    const lng  = parseFloat(document.getElementById('pin-lng')?.value)
-    if (!name)             { toast('Ponle un nombre al lugar'); return }
-    if (isNaN(lat) || isNaN(lng)) { toast('Agrega las coordenadas o usa GPS'); return }
-    const pin = {
-      id:         crypto.randomUUID(),
-      created_by: S.user,
-      name,
-      icon:       document.getElementById('pin-icon')?.value?.trim() || '📍',
-      note:       document.getElementById('pin-note')?.value?.trim() || '',
-      lat, lng,
-      created_at: new Date().toISOString()
+  /* ═══════════════════════════════════════════════════
+     CLAUDE AI HELPER
+  ═══════════════════════════════════════════════════ */
+  async function callClaude(systemPrompt, userPrompt) {
+    if (!CFG.CLAUDE_API_KEY || CFG.CLAUDE_API_KEY.startsWith('YOUR')) {
+      throw new Error('Configura tu CLAUDE_API_KEY en CFG')
     }
-    S.mapPins.unshift(pin)
-    DB._toLocal()
-    if (hasSB()) await sb.from('nido_map_pins').insert(pin)
-    // Agregar al mapa si ya está inicializado
-    if (S.leafletMap) {
-      const icon = pin.icon || '📍'
-      L.marker([lat, lng])
-        .addTo(S.leafletMap)
-        .bindPopup(`<b>${icon} ${name}</b>${pin.note ? '<br>'+pin.note : ''}`)
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': CFG.CLAUDE_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 512,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userPrompt }]
+      })
+    })
+    if (!r.ok) {
+      const err = await r.text()
+      throw new Error(err)
     }
-    closeSheet()
-    toast(`📍 "${name}" guardado en el mapa`, 'ok')
-    renderCurrent()
+    const data = await r.json()
+    return data.content[0].text.trim()
   }
 
   /* ═══════════════════════════════════════════════════
@@ -3364,6 +3289,272 @@
     if (hasSB()) await sb.from('nido_habit_goals').upsert(goal, { onConflict: 'user_id,habit_id,week_start' })
     closeSheet()
     toast(`🎯 Meta de ${days} días guardada`, 'ok')
+    renderCurrent()
+  }
+
+  /* ═══════════════════════════════════════════════════
+     RENDER — JUGAR (temas de conversación · retos)
+  ═══════════════════════════════════════════════════ */
+  const TOPIC_CATS = [
+    { id:'conspira', icon:'🌀', name:'Conspiranoico', color:'#7C3AED', bg:'rgba(124,58,237,.08)',
+      hint:'Teorías, misterios y lo que no nos cuentan' },
+    { id:'espiritual', icon:'🙏', name:'Espiritual', color:'#D97706', bg:'rgba(217,119,6,.08)',
+      hint:'Creencias, muerte, el más allá y lo inexplicable' },
+    { id:'picante', icon:'🌶️', name:'Picante', color:'#DC2626', bg:'rgba(220,38,38,.08)',
+      hint:'Preguntas que dan nervios pero acercan' },
+    { id:'futuro', icon:'🔮', name:'Futuro', color:'#0891B2', bg:'rgba(8,145,178,.08)',
+      hint:'Sueños, miedos y planes que aún no han pasado' },
+    { id:'conoceme', icon:'🤍', name:'Conóceme', color:'#BE185D', bg:'rgba(190,24,93,.08)',
+      hint:'Cosas de infancia, secretos y lo que no saben de mí' },
+    { id:'dilemas', icon:'🎭', name:'Dilemas', color:'#059669', bg:'rgba(5,150,105,.08)',
+      hint:'Preguntas de ¿preferirías...? que generan debate' },
+  ]
+
+  function renderJugar() {
+    const sub  = S.subTab.jugar
+    const tabs = subTabsHtml('jugar', [
+      { id:'temas', label:'💬 Temas' },
+      { id:'retos', label:'🎯 Retos' },
+    ])
+
+    if (sub === 'temas') {
+      const me = CFG.USERS[S.user]
+      let topicsHtml = ''
+      if (S.jugarLoading) {
+        topicsHtml = `<div style="text-align:center;padding:40px 20px">
+          <div style="font-size:32px;margin-bottom:12px">🤔</div>
+          <div style="font-size:14px;color:var(--text-muted);font-weight:500">Claude está pensando...</div>
+        </div>`
+      } else if (S.jugarTopics.length > 0) {
+        topicsHtml = `
+          <div class="card" style="background:linear-gradient(135deg,${S.jugarTopics[0].bg}60,white);border:1.5px solid ${S.jugarTopics[0].color}30">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+              <span style="font-size:24px">${S.jugarTopics[0].icon}</span>
+              <div>
+                <div style="font-size:13px;font-weight:700;color:${S.jugarTopics[0].color}">${S.jugarTopics[0].name}</div>
+                <div style="font-size:11px;color:var(--text-muted)">3 temas para platicar</div>
+              </div>
+              <button onclick="S.jugarTopics=[];renderCurrent()" style="margin-left:auto;background:none;border:none;font-size:18px;cursor:pointer;color:var(--text-muted)">✕</button>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:10px">
+              ${S.jugarTopics[0].questions.map((q, i) => `
+                <div style="background:white;border-radius:12px;padding:14px;border:1px solid ${S.jugarTopics[0].color}20">
+                  <div style="font-size:11px;font-weight:700;color:${S.jugarTopics[0].color};margin-bottom:4px">PREGUNTA ${i+1}</div>
+                  <div style="font-size:14px;line-height:1.5;color:var(--text)">${q}</div>
+                </div>`).join('')}
+            </div>
+            <button onclick="loadTopics('${S.jugarTopics[0].id}')" style="margin-top:14px;width:100%;padding:12px;border-radius:10px;border:1.5px dashed ${S.jugarTopics[0].color}50;background:none;color:${S.jugarTopics[0].color};font-weight:600;font-size:13px;cursor:pointer">🔄 Otras preguntas</button>
+          </div>`
+      }
+
+      const catsHtml = TOPIC_CATS.map(c => `
+        <div onclick="loadTopics('${c.id}')" style="background:${c.bg};border:1.5px solid ${c.color}25;border-radius:14px;padding:16px;cursor:pointer;transition:transform .15s;active:scale(.97)">
+          <div style="font-size:26px;margin-bottom:6px">${c.icon}</div>
+          <div style="font-size:13px;font-weight:700;color:${c.color};margin-bottom:3px">${c.name}</div>
+          <div style="font-size:11px;color:var(--text-muted);line-height:1.4">${c.hint}</div>
+        </div>`).join('')
+
+      document.getElementById('tab-content').innerHTML = `
+        <div class="page">
+          <div class="page-header">
+            <div class="page-title">Temas 💬</div>
+            <div style="font-size:12px;color:var(--text-muted)">Toca una categoría</div>
+          </div>
+          ${tabs}
+          ${topicsHtml}
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px">
+            ${catsHtml}
+          </div>
+          ${!CFG.CLAUDE_API_KEY.startsWith('YOUR') ? '' : `
+            <div class="card" style="background:#FFF8E1;border:1px solid #FDD835;margin-top:4px">
+              <div style="font-size:12px;color:#795548;line-height:1.6">
+                ⚠️ Necesitas configurar tu <strong>CLAUDE_API_KEY</strong> en el código para usar esta sección. Consíguela gratis en <strong>console.anthropic.com</strong>
+              </div>
+            </div>`}
+        </div>`
+      return
+    }
+
+    // ── Sub-tab: Retos semanales ──
+    const { mon, sun } = weekBounds()
+    const weekStr = mon.toISOString().split('T')[0]
+    const myReto   = S.retos.find(r => r.user_id === S.user   && r.week_start === weekStr)
+    const themReto = S.retos.find(r => r.user_id === S.partner && r.week_start === weekStr)
+    const me   = CFG.USERS[S.user]
+    const them = CFG.USERS[S.partner]
+
+    const diffConfig = {
+      easy:   { label:'Fácil',   emoji:'💚', pts:5,  color:'#059669', bg:'rgba(5,150,105,.08)'  },
+      medium: { label:'Medio',   emoji:'💛', pts:10, color:'#D97706', bg:'rgba(217,119,6,.08)'  },
+      hard:   { label:'Difícil', emoji:'❤️', pts:20, color:'#DC2626', bg:'rgba(220,38,38,.08)'  },
+    }
+
+    const myRetoHtml = myReto
+      ? (() => {
+          const dc = diffConfig[myReto.difficulty]
+          return `<div class="card" style="background:${dc.bg};border:1.5px solid ${dc.color}30">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+              <span style="font-size:18px">${dc.emoji}</span>
+              <div style="font-size:12px;font-weight:700;color:${dc.color}">${dc.label} · +${dc.pts} pts</div>
+              ${myReto.completed ? `<span style="margin-left:auto;font-size:12px;background:${dc.color};color:white;padding:3px 8px;border-radius:20px;font-weight:700">✓ ¡Completado!</span>` : ''}
+            </div>
+            <div style="font-size:15px;line-height:1.6;color:var(--text);margin-bottom:14px">${myReto.challenge}</div>
+            ${!myReto.completed ? `<button onclick="completeReto('${myReto.id}')" style="width:100%;padding:13px;border-radius:12px;border:none;background:${dc.color};color:white;font-weight:700;font-size:14px;cursor:pointer">✅ ¡Lo cumplí!</button>` : ''}
+          </div>`
+        })()
+      : `<div class="card" style="text-align:center;padding:24px 16px">
+          <div style="font-size:36px;margin-bottom:10px">🎯</div>
+          <div style="font-size:15px;font-weight:700;margin-bottom:6px">Escoge tu reto de esta semana</div>
+          <div style="font-size:13px;color:var(--text-muted);margin-bottom:18px;line-height:1.5">Mientras más difícil, más puntos ganan juntos</div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            ${Object.entries(diffConfig).map(([k, dc]) => `
+              <button onclick="openPickReto('${k}')" style="width:100%;padding:14px;border-radius:12px;border:2px solid ${dc.color}30;background:${dc.bg};color:${dc.color};font-weight:700;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:space-between">
+                <span>${dc.emoji} ${dc.label}</span>
+                <span style="font-size:12px;opacity:.8">+${dc.pts} puntos</span>
+              </button>`).join('')}
+          </div>
+        </div>`
+
+    const themRetoHtml = themReto
+      ? (() => {
+          const dc = diffConfig[themReto.difficulty]
+          if (!themReto.completed) {
+            // Sorpresa — solo mostrar que tiene reto, sin revelar el texto
+            return `<div class="card" style="background:rgba(0,0,0,.03);border:1.5px dashed rgba(0,0,0,.1);text-align:center;padding:20px 16px">
+              <div style="font-size:28px;margin-bottom:8px">🔒</div>
+              <div style="font-size:14px;font-weight:700;margin-bottom:4px">${them.emoji} ${them.name} tiene un reto esta semana</div>
+              <div style="font-size:12px;color:var(--text-muted);line-height:1.5">Lo verás cuando lo complete — ¡es sorpresa! 🎁</div>
+              <div style="margin-top:10px;display:inline-flex;align-items:center;gap:5px;background:${dc.bg};border-radius:20px;padding:4px 12px;font-size:11px;font-weight:700;color:${dc.color}">${dc.emoji} Nivel ${dc.label}</div>
+            </div>`
+          }
+          return `<div class="card" style="background:${dc.bg};border:1.5px solid ${dc.color}20;opacity:.9">
+            <div style="font-size:12px;color:var(--text-muted);margin-bottom:6px">${them.emoji} Reto de ${them.name} — ¡completado!</div>
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+              <span>${dc.emoji}</span>
+              <div style="font-size:12px;font-weight:600;color:${dc.color}">${dc.label}</div>
+              <span style="font-size:11px;background:${dc.color};color:white;padding:2px 7px;border-radius:20px;font-weight:700;margin-left:auto">✓ Cumplido</span>
+            </div>
+            <div style="font-size:13px;line-height:1.5;color:var(--text-muted);font-style:italic">"${themReto.challenge}"</div>
+          </div>`
+        })()
+      : `<div style="text-align:center;padding:12px;font-size:13px;color:var(--text-muted)">${them.emoji} ${them.name} aún no eligió su reto esta semana</div>`
+
+    const totalPts = S.retos.filter(r => r.completed).reduce((a, r) => a + (diffConfig[r.difficulty]?.pts || 0), 0)
+
+    document.getElementById('tab-content').innerHTML = `
+      <div class="page">
+        <div class="page-header">
+          <div class="page-title">Retos 🎯</div>
+          <div style="font-size:13px;font-weight:700;color:var(--rose)">⭐ ${totalPts} pts</div>
+        </div>
+        ${tabs}
+        <div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">
+          ${me.emoji} Tu reto — semana del ${mon.toLocaleDateString('es-MX',{day:'numeric',month:'short'})}
+        </div>
+        ${myRetoHtml}
+        <div style="font-size:12px;font-weight:600;color:var(--text-muted);margin:12px 0 8px;text-transform:uppercase;letter-spacing:.5px">
+          ${them.emoji} Reto de ${them.name}
+        </div>
+        ${themRetoHtml}
+        ${S.retos.filter(r => r.completed && r.week_start !== weekStr).length > 0 ? `
+          <div style="font-size:12px;font-weight:600;color:var(--text-muted);margin:16px 0 8px;text-transform:uppercase;letter-spacing:.5px">Historial</div>
+          ${S.retos.filter(r => r.completed && r.week_start !== weekStr).slice(0,5).map(r => {
+            const dc = diffConfig[r.difficulty]
+            const u  = CFG.USERS[r.user_id]
+            return `<div class="card" style="padding:12px 16px;display:flex;align-items:center;gap:10px;margin-bottom:6px">
+              <span>${dc.emoji}</span>
+              <div style="flex:1;font-size:12px;color:var(--text-muted);line-height:1.4">${u.emoji} ${r.challenge.slice(0,60)}${r.challenge.length>60?'…':''}</div>
+              <div style="font-size:11px;font-weight:700;color:${dc.color}">+${dc.pts}</div>
+            </div>`
+          }).join('')}` : ''}
+      </div>`
+  }
+
+  async function loadTopics(catId) {
+    const cat = TOPIC_CATS.find(c => c.id === catId)
+    if (!cat) return
+    S.jugarLoading = true
+    renderCurrent()
+    try {
+      const me   = CFG.USERS[S.user].name
+      const them = CFG.USERS[S.partner].name
+      const systemPrompt = `Eres el generador de temas de conversación para la app de pareja Nido.
+Genera 3 preguntas profundas, interesantes y originales para la pareja formada por ${me} y ${them}.
+Las preguntas deben ser en español, en segunda persona singular (tú), estimulantes y apropiadas para una pareja romántica.
+Devuelve EXACTAMENTE 3 preguntas, una por línea, sin numeración, sin viñetas, sin explicaciones extra.`
+      const categoryDescriptions = {
+        conspira:   'teorías conspirativas, misterios sin resolver, cosas que el gobierno o medios ocultan, fenómenos extraños',
+        espiritual: 'creencias sobre la vida después de la muerte, experiencias inexplicables, fe, dios, energía universal, sueños premonitorios',
+        picante:    'preguntas atrevidas que generan tensión sexual, curiosidad íntima, fantasías y deseos entre la pareja, sin ser explícitas',
+        futuro:     'planes de vida, miedos sobre el futuro, sueños que aún no han realizado, cómo se imaginan su vida en 10-20 años',
+        conoceme:   'recuerdos de infancia, secretos que nunca han contado, miedos profundos, cosas que los definen y que la pareja quizá no sabe',
+        dilemas:    'preguntas estilo ¿preferirías? con opciones difíciles e interesantes, situaciones hipotéticas que revelan personalidad',
+      }
+      const text = await callClaude(systemPrompt, `Categoría: ${categoryDescriptions[catId] || catId}`)
+      const questions = text.split('\n').map(l => l.trim()).filter(l => l.length > 0).slice(0, 3)
+      S.jugarTopics = [{ ...cat, questions }]
+    } catch(e) {
+      toast('⚠️ ' + (e.message.includes('CLAUDE_API_KEY') ? 'Configura tu API key en CFG' : 'Error de IA — revisa tu API key'), '')
+      S.jugarTopics = []
+    }
+    S.jugarLoading = false
+    renderCurrent()
+  }
+
+  async function openPickReto(difficulty) {
+    if (!difficulty) {
+      openSmartLog()
+      return
+    }
+    const { mon } = weekBounds()
+    const weekStr = mon.toISOString().split('T')[0]
+    const existing = S.retos.find(r => r.user_id === S.user && r.week_start === weekStr)
+    if (existing) { toast('Ya tienes un reto esta semana 🎯'); return }
+
+    const diffConfig = { easy:'Fácil', medium:'Medio', hard:'Difícil' }
+    const pts = { easy:5, medium:10, hard:20 }
+    const me   = CFG.USERS[S.user]
+    const them = CFG.USERS[S.partner]
+
+    toast('✨ Generando tu reto...')
+
+    try {
+      const systemPrompt = `Eres el generador de retos románticos semanales para la app de pareja Nido.
+Genera un reto ${diffConfig[difficulty]} para ${me.name}. El reto debe involucrar hacer algo especial para su pareja ${them.name}.
+REGLAS:
+- Una sola frase directa en español, empezando con un verbo de acción (ej: "Escríbele", "Prepara", "Sorprende")
+- Nivel ${diffConfig[difficulty]}: ${difficulty === 'easy' ? 'algo sencillo, 5-10 min de esfuerzo' : difficulty === 'medium' ? 'algo que requiere planificación o tiempo' : 'algo memorable, significativo y que requiere esfuerzo real'}
+- Sin explicaciones, solo el reto
+- Máximo 20 palabras`
+      const challenge = await callClaude(systemPrompt, `Genera el reto de nivel ${diffConfig[difficulty]} para esta semana`)
+      const reto = {
+        id:         crypto.randomUUID(),
+        user_id:    S.user,
+        week_start: weekStr,
+        difficulty,
+        challenge,
+        completed:  false,
+        points:     pts[difficulty],
+        created_at: new Date().toISOString()
+      }
+      S.retos.unshift(reto)
+      DB._toLocal()
+      if (hasSB()) await sb.from('nido_retos').insert(reto)
+      toast(`🎯 ¡Reto ${diffConfig[difficulty]} asignado!`, 'ok')
+      renderCurrent()
+    } catch(e) {
+      toast('⚠️ ' + (e.message.includes('CLAUDE_API_KEY') ? 'Configura tu API key' : 'Error generando reto'), '')
+    }
+  }
+
+  async function completeReto(retoId) {
+    const idx = S.retos.findIndex(r => r.id === retoId)
+    if (idx < 0) return
+    S.retos[idx].completed = true
+    DB._toLocal()
+    if (hasSB()) await sb.from('nido_retos').update({ completed: true }, 'id', retoId)
+    const pts = { easy:5, medium:10, hard:20 }[S.retos[idx].difficulty] || 5
+    toast(`🎉 ¡Reto completado! +${pts} puntos`, 'ok')
     renderCurrent()
   }
 
