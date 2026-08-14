@@ -2030,11 +2030,13 @@
     if (sub === 'pendientes') {
       // ── Pendientes juntos ──
       const cats = [
-        { id:'all', label:'Todo' },
-        { id:'pelicula', label:'🎬 Películas' },
-        { id:'serie', label:'📺 Series' },
-        { id:'restaurante', label:'🍽 Restaurantes' },
-        { id:'lugar', label:'🏔 Lugares' }
+        { id:'all',        label:'Todo' },
+        { id:'pelicula',   label:'🎬 Películas' },
+        { id:'serie',      label:'📺 Series' },
+        { id:'restaurante',label:'🍽️ Restaurantes' },
+        { id:'lugar',      label:'📍 Lugares' },
+        { id:'actividad',  label:'🎭 Planes' },
+        { id:'libro',      label:'📚 Libros' },
       ]
       const filterSub = S._pendFilter || 'all'
       const filtered = filterSub === 'all' ? S.pending : S.pending.filter(p => p.type === filterSub)
@@ -2044,7 +2046,7 @@
         ? `<div class="empty"><div class="ei">📌</div><p>Nada por aquí todavía</p></div>`
         : filtered.map(p => `
             <div class="pending-card" onclick="cyclePendingStatus('${p.id}')">
-              <div class="pending-icon">${p.icon}</div>
+              <div class="pending-icon">${p.type_icon || p.icon || '🎬'}</div>
               <div style="flex:1">
                 <div class="pending-name">${p.name}</div>
                 ${p.note ? `<div class="pending-meta">${p.note}</div>` : ''}
@@ -3167,11 +3169,12 @@
       <div class="form-group">
         <label class="form-label">Tipo</label>
         <select class="form-select" id="pend-type">
-          <option value="🎬">🎬 Película / Serie</option>
-          <option value="🍽️">🍽️ Restaurante</option>
-          <option value="📍">📍 Lugar / Viaje</option>
-          <option value="🎭">🎭 Actividad / Plan</option>
-          <option value="📚">📚 Libro</option>
+          <option value="pelicula">🎬 Película</option>
+          <option value="serie">📺 Serie</option>
+          <option value="restaurante">🍽️ Restaurante</option>
+          <option value="lugar">📍 Lugar / Viaje</option>
+          <option value="actividad">🎭 Actividad / Plan</option>
+          <option value="libro">📚 Libro</option>
         </select>
       </div>
       <div class="form-group">
@@ -3189,10 +3192,13 @@
   async function submitAddPending() {
     const name = document.getElementById('pend-name')?.value?.trim()
     if (!name) { toast('Escribe el nombre'); return }
+    const PEND_ICONS = { pelicula:'🎬', serie:'📺', restaurante:'🍽️', lugar:'📍', actividad:'🎭', libro:'📚' }
+    const type = document.getElementById('pend-type')?.value || 'pelicula'
     const item = {
       id:         crypto.randomUUID(),
       created_by: S.user,
-      type_icon:  document.getElementById('pend-type')?.value || '🎬',
+      type,
+      type_icon:  PEND_ICONS[type] || '🎬',
       name,
       note:       document.getElementById('pend-note')?.value?.trim() || '',
       status:     'want',
