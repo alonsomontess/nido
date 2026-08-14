@@ -964,7 +964,7 @@
 
     // Claude API — pon tu Anthropic API key para habilitar temas y retos con IA
     // Consíguela en: console.anthropic.com → API Keys
-    CLAUDE_API_KEY: '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'
+    CLAUDE_API_KEY: 'YOUR_ANTHROPIC_API_KEY'
   }
 
   /* ═══════════════════════════════════════════════════
@@ -2394,6 +2394,7 @@
     }
 
     // ── Config ──
+    const claudeOk = CFG.CLAUDE_API_KEY && !CFG.CLAUDE_API_KEY.startsWith('YOUR')
     document.getElementById('tab-content').innerHTML = `
       <div class="page">
         <div class="page-header"><div class="page-title">Config ⚙️</div></div>
@@ -2410,6 +2411,10 @@
           <div class="cfg-row">
             <div><div class="cfg-lbl">Google Calendar</div><div class="cfg-val">${GCAL.isConnected() ? '✅ Conectado' : '❌ Sin conectar'}</div></div>
             ${GCAL.isConnected() ? `<button class="btn-ghost" onclick="GCAL.disconnect();renderCurrent()">Desconectar</button>` : `<button class="btn-ghost" onclick="GCAL.connect()">Conectar</button>`}
+          </div>
+          <div class="cfg-row">
+            <div><div class="cfg-lbl">IA (Temas y Retos)</div><div class="cfg-val">${claudeOk ? '✅ Activada' : '❌ Sin API key'}</div></div>
+            <button class="btn-ghost" onclick="openClaudeKeySetup()">Configurar</button>
           </div>
         </div>
       </div>`
@@ -2642,6 +2647,35 @@
     }
   }
 
+  function openClaudeKeySetup() {
+    const current = CFG.CLAUDE_API_KEY?.startsWith('YOUR') ? '' : (CFG.CLAUDE_API_KEY || '')
+    document.getElementById('sheet-body').innerHTML = `
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">🤖 API key de Claude</div>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;line-height:1.6">
+        Necesaria para generar temas de conversación y retos semanales. Se guarda solo en este dispositivo, nunca en ningún servidor.
+      </p>
+      <div class="form-group">
+        <label class="form-label">Anthropic API Key</label>
+        <input type="password" class="form-input" id="claude-key-input" placeholder="sk-ant-api03-..." value="${current}" />
+      </div>
+      <button class="btn-primary" onclick="saveClaudeKey()">Guardar</button>
+      <div style="margin-top:12px;padding:12px;background:var(--rose-ghost);border-radius:12px;font-size:12px;color:var(--text-muted);line-height:1.7">
+        Consíguela gratis en <strong>console.anthropic.com</strong> → API Keys → Create Key
+      </div>`
+    document.getElementById('sheet-wrap').classList.add('open')
+  }
+
+  function saveClaudeKey() {
+    const key = document.getElementById('claude-key-input')?.value?.trim()
+    if (!key || !key.startsWith('sk-ant-')) { toast('API key inválida — debe empezar con sk-ant-'); return }
+    CFG.CLAUDE_API_KEY = key
+    localStorage.setItem('nido_claude_key', key)
+    closeSheet()
+    toast('✅ IA activada', 'ok')
+    renderCurrent()
+  }
+
   /* ═══════════════════════════════════════════════════
      NAVIGATION
   ═══════════════════════════════════════════════════ */
@@ -2717,17 +2751,21 @@
   async function boot() {
     showLoader('Cargando Nido...')
     try {
-      // Load saved Supabase config
+      // Load saved Supabase config (localStorage overrides CFG defaults)
       const savedUrl = localStorage.getItem('nido_sb_url')
       const savedKey = localStorage.getItem('nido_sb_key')
       if (savedUrl && savedKey) {
         CFG.SUPABASE_URL = savedUrl
         CFG.SUPABASE_KEY = savedKey
-        initSB()
       }
+      // Always init Supabase with whatever credentials we have in CFG
+      if (initSB()) RT.sub()
+
+      // Load Claude API key from localStorage
+      const savedClaudeKey = localStorage.getItem('nido_claude_key')
+      if (savedClaudeKey) CFG.CLAUDE_API_KEY = savedClaudeKey
       await DB.loadAll()
       if (hasSB()) {
-        RT.sub()
         // Auto-sync cada 30 segundos como respaldo al Realtime
         setInterval(async () => {
           await DB.loadAll()
@@ -3188,7 +3226,7 @@
   ═══════════════════════════════════════════════════ */
   async function callClaude(systemPrompt, userPrompt) {
     if (!CFG.CLAUDE_API_KEY || CFG.CLAUDE_API_KEY.startsWith('YOUR')) {
-      throw new Error('Configura tu CLAUDE_API_KEY en CFG')
+      throw new Error('CLAUDE_API_KEY no configurada')
     }
     const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -3367,9 +3405,10 @@
           </div>
           ${!CFG.CLAUDE_API_KEY.startsWith('YOUR') ? '' : `
             <div class="card" style="background:#FFF8E1;border:1px solid #FDD835;margin-top:4px">
-              <div style="font-size:12px;color:#795548;line-height:1.6">
-                ⚠️ Necesitas configurar tu <strong>CLAUDE_API_KEY</strong> en el código para usar esta sección. Consíguela gratis en <strong>console.anthropic.com</strong>
+              <div style="font-size:12px;color:#795548;line-height:1.6;margin-bottom:10px">
+                🤖 Para usar esta sección necesitas una API key de Claude. Consíguela gratis en <strong>console.anthropic.com</strong>
               </div>
+              <button class="btn-primary" style="font-size:13px;padding:8px 16px" onclick="openClaudeKeySetup()">Configurar API key</button>
             </div>`}
         </div>`
       return
@@ -3494,7 +3533,7 @@ Devuelve EXACTAMENTE 3 preguntas, una por línea, sin numeración, sin viñetas,
       const questions = text.split('\n').map(l => l.trim()).filter(l => l.length > 0).slice(0, 3)
       S.jugarTopics = [{ ...cat, questions }]
     } catch(e) {
-      toast('⚠️ ' + (e.message.includes('CLAUDE_API_KEY') ? 'Configura tu API key en CFG' : 'Error de IA — revisa tu API key'), '')
+      toast('⚠️ ' + (e.message.includes('CLAUDE_API_KEY') ? 'Ve a NIDO → Config → IA para configurar tu API key' : 'Error de IA — revisa tu API key en Config'), '')
       S.jugarTopics = []
     }
     S.jugarLoading = false
@@ -3543,7 +3582,7 @@ REGLAS:
       toast(`🎯 ¡Reto ${diffConfig[difficulty]} asignado!`, 'ok')
       renderCurrent()
     } catch(e) {
-      toast('⚠️ ' + (e.message.includes('CLAUDE_API_KEY') ? 'Configura tu API key' : 'Error generando reto'), '')
+      toast('⚠️ ' + (e.message.includes('CLAUDE_API_KEY') ? 'Ve a NIDO → Config → IA para configurar tu API key' : 'Error generando reto'), '')
     }
   }
 
