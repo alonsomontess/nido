@@ -2044,8 +2044,10 @@
         { id:'actividad',  label:'🎭 Planes' },
         { id:'libro',      label:'📚 Libros' },
       ]
+      const ICON_TYPE = { '🎬':'pelicula','📺':'serie','🍽️':'restaurante','📍':'lugar','🎭':'actividad','📚':'libro' }
+      const pendType  = p => p.type || ICON_TYPE[p.type_icon] || 'pelicula'
       const filterSub = S._pendFilter || 'all'
-      const filtered = filterSub === 'all' ? S.pending : S.pending.filter(p => p.type === filterSub)
+      const filtered = filterSub === 'all' ? S.pending : S.pending.filter(p => pendType(p) === filterSub)
       const statusLabel = { want:'Quiero', booked:'Reservado', done:'Fuimos/Vimos' }
       const statusCls   = { want:'status-want', booked:'status-booked', done:'status-done' }
       const listHtml = filtered.length === 0
@@ -3450,6 +3452,7 @@
       easy:   { label:'Fácil',   emoji:'💚', pts:5,  color:'#059669', bg:'rgba(5,150,105,.08)'  },
       medium: { label:'Medio',   emoji:'💛', pts:10, color:'#D97706', bg:'rgba(217,119,6,.08)'  },
       hard:   { label:'Difícil', emoji:'❤️', pts:20, color:'#DC2626', bg:'rgba(220,38,38,.08)'  },
+      spicy:  { label:'Picante', emoji:'🌶️', pts:15, color:'#BE185D', bg:'rgba(190,24,93,.08)'  },
     }
 
     const myRetoHtml = myReto
@@ -3571,6 +3574,7 @@ Devuelve EXACTAMENTE 3 preguntas, una por línea, sin numeración, sin viñetas,
       easy:   { label:'Fácil',   emoji:'💚', pts:5,  color:'#059669', bg:'rgba(5,150,105,.08)'  },
       medium: { label:'Medio',   emoji:'💛', pts:10, color:'#D97706', bg:'rgba(217,119,6,.08)'  },
       hard:   { label:'Difícil', emoji:'❤️', pts:20, color:'#DC2626', bg:'rgba(220,38,38,.08)'  },
+      spicy:  { label:'Picante', emoji:'🌶️', pts:15, color:'#BE185D', bg:'rgba(190,24,93,.08)'  },
     }
     document.getElementById('sheet-body').innerHTML = `
       <div class="sheet-handle"></div>
@@ -3603,22 +3607,41 @@ Devuelve EXACTAMENTE 3 preguntas, una por línea, sin numeración, sin viñetas,
     const weekRetos = S.retos.filter(r => r.user_id === S.user && r.week_start.startsWith(weekStr))
     const retoWeekKey = isExtra ? `${weekStr}-${weekRetos.length + 1}` : weekStr
 
-    const diffLabels = { easy:'Fácil', medium:'Medio', hard:'Difícil' }
-    const pts = { easy:5, medium:10, hard:20 }
+    const diffLabels = { easy:'Fácil', medium:'Medio', hard:'Difícil', spicy:'Picante' }
+    const pts = { easy:5, medium:10, hard:20, spicy:15 }
     const me   = CFG.USERS[S.user]
     const them = CFG.USERS[S.partner]
 
     toast('✨ Generando tu reto...')
 
+    // Pool de retos ya usados esta semana (para evitar repetir)
+    const usedChallenges = S.retos.filter(r => r.user_id === S.user).map(r => r.challenge).join(' | ')
+
     try {
-      const systemPrompt = `Eres el generador de retos románticos semanales para la app de pareja Nido.
-Genera un reto ${diffLabels[difficulty]} para ${me.name}. El reto debe involucrar hacer algo especial para su pareja ${them.name}.
+      const isSpicy = difficulty === 'spicy'
+      const systemPrompt = isSpicy
+        ? `Eres el generador de retos íntimos y sensuales para la app de pareja Nido.
+Genera un reto picante para ${me.name} hacia su pareja ${them.name}. Debe ser sugerente, divertido y ayudar a reavivar la intimidad.
 REGLAS:
-- Una sola frase directa en español, empezando con un verbo de acción (ej: "Escríbele", "Prepara", "Sorprende")
-- Nivel ${diffLabels[difficulty]}: ${difficulty === 'easy' ? 'algo sencillo, 5-10 min de esfuerzo' : difficulty === 'medium' ? 'algo que requiere planificación o tiempo' : 'algo memorable, significativo y que requiere esfuerzo real'}
-- Sin explicaciones, solo el reto
-- Máximo 20 palabras`
-      const challenge = await callClaude(systemPrompt, `Genera el reto de nivel ${diffLabels[difficulty]} para esta semana`)
+- Una sola frase directa en español, empezando con un verbo (ej: "Mándale", "Sorpréndela/o", "Esta noche", "Propone")
+- Debe ser atrevido pero no explícito — sugerente, sensual, coqueto
+- Puede incluir: mensajes coquetos, juegos de pareja, planes íntimos, sorpresas romántico-sensuales
+- PROHIBIDO repetir ideas de: ${usedChallenges || 'ninguno aún'}
+- Sin explicaciones. Solo el reto. Máximo 20 palabras.`
+        : `Eres el generador de retos románticos semanales para la app de pareja Nido.
+Genera un reto de nivel ${diffLabels[difficulty]} para ${me.name} hacia su pareja ${them.name}.
+CATEGORÍAS de retos posibles (varía entre ellas, no siempre uses la misma):
+- Detalles físicos: nota escondida, desayuno sorpresa, flores, su postre favorito
+- Calidad de tiempo: plan de fecha, tarde sin teléfono, actividad nueva juntos
+- Palabras de afirmación: carta escrita a mano, playlist con significado, mensaje de voz
+- Actos de servicio: hacerle algo que normalmente él/ella hace, resolver algo pendiente
+- Regalos simbólicos: algo pequeño pero significativo, foto impresa, recuerdo compartido
+NIVEL ${diffLabels[difficulty]}: ${difficulty === 'easy' ? 'sencillo, 5-10 min' : difficulty === 'medium' ? 'requiere planificación o tiempo' : 'algo memorable que requiere esfuerzo real, no una cena'}
+PROHIBIDO repetir: ${usedChallenges || 'ninguno aún'}
+PROHIBIDO: sugerir "cena sorpresa" o variaciones de cena — busca algo diferente.
+Una sola frase directa en español, empieza con verbo. Sin explicaciones. Máximo 20 palabras.`
+
+      const challenge = await callClaude(systemPrompt, `Reto de nivel ${diffLabels[difficulty]} para esta semana. Sé creativo y específico.`)
       const reto = {
         id:         crypto.randomUUID(),
         user_id:    S.user,
