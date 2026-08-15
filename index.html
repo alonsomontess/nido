@@ -1024,6 +1024,12 @@
           sb.from('nido_habit_goals').select('*').order('created_at', { ascending: false }),
           sb.from('nido_retos'      ).select('*').order('created_at', { ascending: false })
         ])
+        const merge = (local, remote) => {
+          if (!remote?.length) return local
+          const remoteIds = new Set(remote.map(r => r.id))
+          const localOnly = local.filter(l => l.id && !remoteIds.has(l.id))
+          return [...remote, ...localOnly].sort((a,b) => (b.created_at||'').localeCompare(a.created_at||''))
+        }
         if (sv.data?.length) S.savings    = sv.data
         if (hb.data?.length) S.habits     = hb.data
         if (sp.data?.length) S.sparks     = sp.data
@@ -1031,10 +1037,10 @@
         if (go.data?.length) S.goals      = go.data
         if (fi.data?.length) S.fitness    = fi.data
         if (me.data?.length) S.memories   = me.data
-        if (pe.data?.length) S.pending    = pe.data
+        S.pending    = merge(S.pending,    pe.data)
         if (no.data?.length) S.notes      = no.data
         if (hg.data?.length) S.habitGoals = hg.data
-        if (re.data?.length) S.retos      = re.data
+        S.retos      = merge(S.retos,      re.data)
         this._toLocal()
       } catch(e) { console.error('Supabase load error:', e) }
     },
@@ -3206,7 +3212,10 @@
     }
     S.pending.unshift(item)
     DB._toLocal()
-    if (hasSB()) await sb.from('nido_pending').insert(item)
+    if (hasSB()) {
+      const { error } = await sb.from('nido_pending').insert({ id:item.id, created_by:item.created_by, type_icon:item.type_icon, name:item.name, note:item.note, status:item.status, created_at:item.created_at })
+      if (error) console.warn('Pending insert error:', error)
+    }
     closeSheet()
     toast(`✨ "${name}" agregado a la lista`, 'ok')
     renderCurrent()
@@ -3215,12 +3224,19 @@
   async function cyclePendingStatus(id) {
     const item = S.pending.find(p => p.id === id)
     if (!item) return
-    const cycle = { want: 'booked', booked: 'done', done: 'want' }
+    // Si ya está done, preguntar qué hacer
+    if (item.status === 'done') { openPendingDoneSheet(id); return }
+    const cycle = { want: 'booked', booked: 'done' }
     const labels = { want: '📋 Quiero', booked: '🗓️ Agendado', done: '✅ Hecho' }
-    item.status = cycle[item.status] || 'want'
+    const next = cycle[item.status] || 'want'
+    item.status = next
     DB._toLocal()
-    if (hasSB()) await sb.from('nido_pending').update({ status: item.status }).eq('id', id)
-    toast(`${labels[item.status]}`, 'ok')
+    if (hasSB()) await sb.from('nido_pending').update({ status: next }).eq('id', id)
+    if (next === 'done') {
+      toast('🎊 ¡Lo hicieron! Toca de nuevo para decidir qué hacer', 'ok')
+    } else {
+      toast(`${labels[next]}`, 'ok')
+    }
     renderCurrent()
   }
 
@@ -3423,8 +3439,10 @@
     // ── Sub-tab: Retos semanales ──
     const { mon, sun } = weekBounds()
     const weekStr = mon.toISOString().split('T')[0]
-    const myReto   = S.retos.find(r => r.user_id === S.user   && r.week_start === weekStr)
-    const themReto = S.retos.find(r => r.user_id === S.partner && r.week_start === weekStr)
+    const myWeekRetos  = S.retos.filter(r => r.user_id === S.user    && r.week_start.startsWith(weekStr))
+    const themWeekRetos= S.retos.filter(r => r.user_id === S.partner && r.week_start.startsWith(weekStr))
+    const myReto   = myWeekRetos.find(r => !r.completed) || myWeekRetos[0]
+    const themReto = themWeekRetos.find(r => !r.completed) || themWeekRetos[0]
     const me   = CFG.USERS[S.user]
     const them = CFG.USERS[S.partner]
 
@@ -3444,7 +3462,9 @@
               ${myReto.completed ? `<span style="margin-left:auto;font-size:12px;background:${dc.color};color:white;padding:3px 8px;border-radius:20px;font-weight:700">✓ ¡Completado!</span>` : ''}
             </div>
             <div style="font-size:15px;line-height:1.6;color:var(--text);margin-bottom:14px">${myReto.challenge}</div>
-            ${!myReto.completed ? `<button onclick="completeReto('${myReto.id}')" style="width:100%;padding:13px;border-radius:12px;border:none;background:${dc.color};color:white;font-weight:700;font-size:14px;cursor:pointer">✅ ¡Lo cumplí!</button>` : ''}
+            ${!myReto.completed
+              ? `<button onclick="completeReto('${myReto.id}')" style="width:100%;padding:13px;border-radius:12px;border:none;background:${dc.color};color:white;font-weight:700;font-size:14px;cursor:pointer">✅ ¡Lo cumplí!</button>`
+              : `<button onclick="openExtraRetoPicker()" style="width:100%;padding:11px;border-radius:12px;border:2px dashed ${dc.color}60;background:transparent;color:${dc.color};font-weight:700;font-size:13px;cursor:pointer;margin-top:4px">✨ Quiero otro reto esta semana</button>`}
           </div>`
         })()
       : `<div class="card" style="text-align:center;padding:24px 16px">
@@ -3546,17 +3566,44 @@ Devuelve EXACTAMENTE 3 preguntas, una por línea, sin numeración, sin viñetas,
     renderCurrent()
   }
 
-  async function openPickReto(difficulty) {
+  function openExtraRetoPicker() {
+    const diffConfig = {
+      easy:   { label:'Fácil',   emoji:'💚', pts:5,  color:'#059669', bg:'rgba(5,150,105,.08)'  },
+      medium: { label:'Medio',   emoji:'💛', pts:10, color:'#D97706', bg:'rgba(217,119,6,.08)'  },
+      hard:   { label:'Difícil', emoji:'❤️', pts:20, color:'#DC2626', bg:'rgba(220,38,38,.08)'  },
+    }
+    document.getElementById('sheet-body').innerHTML = `
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">✨ Otro reto esta semana</div>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px">Escoge la dificultad — mientras más difícil, más puntos</p>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        ${Object.entries(diffConfig).map(([k, dc]) => `
+          <button onclick="closeSheet();openPickReto('${k}',true)" style="width:100%;padding:14px;border-radius:12px;border:2px solid ${dc.color}30;background:${dc.bg};color:${dc.color};font-weight:700;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:space-between">
+            <span>${dc.emoji} ${dc.label}</span>
+            <span style="font-size:12px;opacity:.8">+${dc.pts} puntos</span>
+          </button>`).join('')}
+      </div>`
+    document.getElementById('sheet-wrap').classList.add('open')
+  }
+
+  async function openPickReto(difficulty, isExtra = false) {
     if (!difficulty) {
       openSmartLog()
       return
     }
     const { mon } = weekBounds()
     const weekStr = mon.toISOString().split('T')[0]
-    const existing = S.retos.find(r => r.user_id === S.user && r.week_start === weekStr)
-    if (existing) { toast('Ya tienes un reto esta semana 🎯'); return }
 
-    const diffConfig = { easy:'Fácil', medium:'Medio', hard:'Difícil' }
+    if (!isExtra) {
+      const existing = S.retos.find(r => r.user_id === S.user && r.week_start.startsWith(weekStr) && !r.completed)
+      if (existing) { toast('Ya tienes un reto activo esta semana 🎯'); return }
+    }
+
+    // Para retos extra, usar un week_start único para evitar conflicto en Supabase
+    const weekRetos = S.retos.filter(r => r.user_id === S.user && r.week_start.startsWith(weekStr))
+    const retoWeekKey = isExtra ? `${weekStr}-${weekRetos.length + 1}` : weekStr
+
+    const diffLabels = { easy:'Fácil', medium:'Medio', hard:'Difícil' }
     const pts = { easy:5, medium:10, hard:20 }
     const me   = CFG.USERS[S.user]
     const them = CFG.USERS[S.partner]
@@ -3565,17 +3612,17 @@ Devuelve EXACTAMENTE 3 preguntas, una por línea, sin numeración, sin viñetas,
 
     try {
       const systemPrompt = `Eres el generador de retos románticos semanales para la app de pareja Nido.
-Genera un reto ${diffConfig[difficulty]} para ${me.name}. El reto debe involucrar hacer algo especial para su pareja ${them.name}.
+Genera un reto ${diffLabels[difficulty]} para ${me.name}. El reto debe involucrar hacer algo especial para su pareja ${them.name}.
 REGLAS:
 - Una sola frase directa en español, empezando con un verbo de acción (ej: "Escríbele", "Prepara", "Sorprende")
-- Nivel ${diffConfig[difficulty]}: ${difficulty === 'easy' ? 'algo sencillo, 5-10 min de esfuerzo' : difficulty === 'medium' ? 'algo que requiere planificación o tiempo' : 'algo memorable, significativo y que requiere esfuerzo real'}
+- Nivel ${diffLabels[difficulty]}: ${difficulty === 'easy' ? 'algo sencillo, 5-10 min de esfuerzo' : difficulty === 'medium' ? 'algo que requiere planificación o tiempo' : 'algo memorable, significativo y que requiere esfuerzo real'}
 - Sin explicaciones, solo el reto
 - Máximo 20 palabras`
-      const challenge = await callClaude(systemPrompt, `Genera el reto de nivel ${diffConfig[difficulty]} para esta semana`)
+      const challenge = await callClaude(systemPrompt, `Genera el reto de nivel ${diffLabels[difficulty]} para esta semana`)
       const reto = {
         id:         crypto.randomUUID(),
         user_id:    S.user,
-        week_start: weekStr,
+        week_start: retoWeekKey,
         difficulty,
         challenge,
         completed:  false,
@@ -3584,8 +3631,11 @@ REGLAS:
       }
       S.retos.unshift(reto)
       DB._toLocal()
-      if (hasSB()) await sb.from('nido_retos').insert(reto)
-      toast(`🎯 ¡Reto ${diffConfig[difficulty]} asignado!`, 'ok')
+      if (hasSB()) {
+        const { error } = await sb.from('nido_retos').insert(reto)
+        if (error) console.warn('Reto insert error:', error)
+      }
+      toast(`🎯 ¡Reto ${diffLabels[difficulty]} asignado!`, 'ok')
       renderCurrent()
     } catch(e) {
       toast('⚠️ ' + (e.message.includes('CLAUDE_API_KEY') ? 'Ve a NIDO → Config → IA para configurar tu API key' : 'Error generando reto'), '')
@@ -3597,9 +3647,57 @@ REGLAS:
     if (idx < 0) return
     S.retos[idx].completed = true
     DB._toLocal()
-    if (hasSB()) await sb.from('nido_retos').update({ completed: true }, 'id', retoId)
+    if (hasSB()) await sb.from('nido_retos').update({ completed: true }).eq('id', retoId)
     const pts = { easy:5, medium:10, hard:20 }[S.retos[idx].difficulty] || 5
-    toast(`🎉 ¡Reto completado! +${pts} puntos`, 'ok')
+    // Mostrar celebración y opción de agregar otro reto
+    const week = S.retos[idx].week_start
+    document.getElementById('sheet-body').innerHTML = `
+      <div class="sheet-handle"></div>
+      <div style="text-align:center;padding:20px 0 10px">
+        <div style="font-size:52px;margin-bottom:8px">🎉</div>
+        <div style="font-size:20px;font-weight:800;color:var(--rose)">¡Reto cumplido!</div>
+        <div style="font-size:14px;color:var(--text-muted);margin-top:4px">+${pts} puntos ganados esta semana</div>
+      </div>
+      <div style="margin:16px 0;padding:14px;background:var(--rose-ghost);border-radius:14px;text-align:center;font-size:13px;color:var(--text-muted)">
+        ¿Quieres agregar otro reto para esta semana?
+      </div>
+      <button class="btn-primary" onclick="closeSheet();openExtraRetoPicker()">✨ Sí, quiero otro reto</button>
+      <button class="btn-ghost" style="width:100%;margin-top:8px" onclick="closeSheet();renderCurrent()">No, por ahora está bien</button>`
+    document.getElementById('sheet-wrap').classList.add('open')
+  }
+
+  async function deletePending(id) {
+    S.pending = S.pending.filter(p => p.id !== id)
+    DB._toLocal()
+    if (hasSB()) await sb.from('nido_pending').delete().eq('id', id)
+    closeSheet()
+    renderCurrent()
+  }
+
+  function openPendingDoneSheet(id) {
+    const item = S.pending.find(p => p.id === id)
+    if (!item) return
+    document.getElementById('sheet-body').innerHTML = `
+      <div class="sheet-handle"></div>
+      <div style="text-align:center;padding:16px 0 8px">
+        <div style="font-size:40px">${item.type_icon || '🎬'}</div>
+        <div style="font-size:17px;font-weight:800;margin-top:8px">${item.name}</div>
+        <div style="font-size:13px;color:var(--text-muted);margin-top:4px">¡Ya lo hicieron! ¿Qué quieren hacer con esto?</div>
+      </div>
+      <button class="btn-primary" style="margin-top:16px" onclick="resetPending('${id}')">💫 Volvería / lo repetiría</button>
+      <button class="btn-ghost" style="width:100%;margin-top:8px;color:#DC2626" onclick="deletePending('${id}')">🗑️ Eliminar de la lista</button>
+      <button class="btn-ghost" style="width:100%;margin-top:8px" onclick="closeSheet()">Cancelar</button>`
+    document.getElementById('sheet-wrap').classList.add('open')
+  }
+
+  async function resetPending(id) {
+    const item = S.pending.find(p => p.id === id)
+    if (!item) return
+    item.status = 'want'
+    DB._toLocal()
+    if (hasSB()) await sb.from('nido_pending').update({ status: 'want' }).eq('id', id)
+    closeSheet()
+    toast('💫 ¡Guardado para repetir!', 'ok')
     renderCurrent()
   }
 
